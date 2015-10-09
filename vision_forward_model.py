@@ -1,4 +1,4 @@
-'''
+"""
 Inferring 3D Shape from 2D Images
 
 This file contains the vision forward model that renders  
@@ -8,7 +8,7 @@ Created on Aug 27, 2015
 
 Goker Erdogan
 https://github.com/gokererdogan/
-'''
+"""
 
 import vtk
 from vtk.util.numpy_support import vtk_to_numpy
@@ -16,6 +16,10 @@ import numpy as np
 import scipy.misc
 from gmllib.helpers import rgb2gray
 
+# canonical view +- 45 degrees
+DEFAULT_CAMERA_POS = [(3.0, -3.0, 3.0), (4.242, 0.0, 3.0), (0.0, -4.242, 3.0), (3.0, 3.0, 3.0), (-3.0, -3.0, 3.0)]
+DEFAULT_RENDER_SIZE = (100, 100)
+DEFAULT_CAMERA_UP = (0, 0, 1)
 
 class VisionForwardModel:
     """
@@ -27,14 +31,14 @@ class VisionForwardModel:
     instance which contains the position and size of each
     part
     """
-    # canonical view +- 15 degrees
-    camera_pos = [(3.0, -3.0, 3.0), (3.674, -2.121, 3.0), (2.121, -3.674, 3.0), (4.098, -1.098, 3.0), (1.098, -4.098, 3.0)]
-    camera_up = (0, 0, 1)
-    render_size = (300, 300)
-    def __init__(self):
+    def __init__(self, render_size=DEFAULT_RENDER_SIZE, camera_pos=DEFAULT_CAMERA_POS, camera_up=DEFAULT_CAMERA_UP):
         """
         Initializes VTK objects for rendering.
         """
+        self.render_size = render_size
+        self.camera_pos = camera_pos
+        self.camera_up = camera_up
+
         # vtk objects for rendering
         self.vtkrenderer = vtk.vtkRenderer()
 
@@ -111,13 +115,15 @@ class VisionForwardModel:
         self.vtkcamera.SetFocalPoint(0, 0, 0)
         self.vtkcamera.SetViewUp(self.camera_up)
  
-    def render(self, shape):
+    def render(self, shape, for_save=False):
         """
         Construct the 3D object from Shape instance and render it.
         Returns numpy array with size number of viewpoints x self.render_size
         """
         self._build_scene(shape)
-        img_arr = np.zeros((self.camera_view_count, self.render_size[0], self.render_size[1]))
+        w = self.render_size[0]
+        h = self.render_size[1]
+        img_arr = np.zeros((self.camera_view_count, w, h))
         for i, camera_pos in enumerate(self.camera_pos):
             self.vtkcamera.SetPosition(camera_pos)
             img_arr[i, :, :] = self._render_window_to2D()
@@ -125,7 +131,7 @@ class VisionForwardModel:
     
     def _render_window_to2D(self):
         """
-        Renders the window to 2D black and white image
+        Renders the window to 2D grayscale image
         Called from render function for each viewpoint
         """
         self.vtkrender_window.Render()
@@ -150,10 +156,9 @@ class VisionForwardModel:
         # clear scene
         self.vtkrenderer.RemoveAllViewProps()
         self.vtkrenderer.Clear()
-        # add objects
-        for part in shape.parts:
-            position = part.position
-            size = part.size
+        # add parts to scene
+        positions, sizes = shape.convert_to_positions_sizes()
+        for position, size in zip(positions, sizes):
             actor = vtk.vtkActor()
             actor.SetMapper(self.part_mapper)
             actor.SetPosition(position)

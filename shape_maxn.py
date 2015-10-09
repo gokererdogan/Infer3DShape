@@ -1,4 +1,4 @@
-'''
+"""
 Inferring 3D Shape from 2D Images
 
 This file contains the ShapeMaxN class which implements a
@@ -10,7 +10,7 @@ Created on Sep 14, 2015
 
 Goker Erdogan
 https://github.com/gokererdogan/
-'''
+"""
 
 from hypothesis import *
 
@@ -54,12 +54,18 @@ class ShapeMaxNProposal(ShapeProposal):
     for the ShapeMaxN class.
         add/remove part, move part, change part size
     """
-    def __init__(self):
-        Proposal.__init__(self)
+    def __init__(self, allow_add_remove=True):
+        # do we allow add/remove part move?
+        self.allow_add_remove = allow_add_remove
+        ShapeProposal.__init__(self)
 
     def propose(self, h, *args):
         # pick one move randomly
-        i = np.random.randint(0, 5)
+        if self.allow_add_remove:
+            i = np.random.randint(0, 5)
+        else:
+            i = np.random.randint(1, 5)
+
         if i == 0:
             info = "add/remove part"
             hp, q_hp_h, q_h_hp = self.add_remove_part(h)
@@ -122,20 +128,25 @@ if __name__ == "__main__":
     fwm = vfm.VisionForwardModel()
     kernel = ShapeMaxNProposal()
 
-    max_part_count = 6
+    max_part_count = 8
     # generate initial hypothesis shape randomly
     h = ShapeMaxN(fwm, max_part_count)
 
     # read data (i.e., observed image) from disk
-    data = np.load('test3.npy')
+    obj_name = 'o1_t2_rp_d2'
+    data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(obj_name))
+    # data = np.load('./data/test2.npy')
 
-    sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 20000)
+    sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 20, 20000, 2000)
     run = sampler.sample()
     print(run.best_samples.samples)
     print()
     print(run.best_samples.probs)
+    run.save('{0:s}.pkl'.format(obj_name))
 
+"""
     for i, sample in enumerate(run.samples.samples):
         fwm.save_render("samples_maxn/s{0:d}.png".format(i), sample)
     for i, sample in enumerate(run.best_samples.samples):
         fwm.save_render("samples_maxn/b{0:d}.png".format(i), sample)
+"""

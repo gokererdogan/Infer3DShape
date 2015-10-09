@@ -1,4 +1,4 @@
-'''
+"""
 Inferring 3D Shape from 2D Images
 
 This file contains the MCMC samplers for sampling from the posterior
@@ -10,14 +10,16 @@ Created on Aug 28, 2015
 
 Goker Erdogan
 https://github.com/gokererdogan/
-'''
+"""
 
 import numpy as np
 import time
 import matplotlib.pyplot as plt
 import pandas as pd
+import pandasql as psql
+import cPickle
 
-BEST_SAMPLES_LIST_SIZE = 10
+BEST_SAMPLES_LIST_SIZE = 20
 
 class MCMCRun:
     """
@@ -53,6 +55,17 @@ class MCMCRun:
         # calculate moving average
         pd.rolling_mean(self.iter_df.IsAccepted, window=window_size).plot()
 
+    def acceptance_rate_by_move(self):
+        df = self.iter_df
+        return psql.sqldf("select MoveType, AVG(IsAccepted) from df group by MoveType", env=locals())
+
+    def save(self, filename):
+        cPickle.dump(obj=self, file=open(filename, 'wb'), protocol=2)
+
+    @staticmethod
+    def load(filename):
+        return cPickle.load(open(filename, 'r'))
+
 
 class SampleSet:
     """
@@ -78,6 +91,15 @@ class SampleSet:
             prob = self.probs.pop(i)
             iter = self.iters.pop(i)
             info = self.infos.pop(i)
+            return s, prob, iter, info
+        return None
+
+    def __getitem__(self, item):
+        if item < len(self.samples):
+            s = self.samples[item]
+            prob = self.probs[item]
+            iter = self.iters[item]
+            info = self.infos[item]
             return s, prob, iter, info
         return None
 
@@ -107,7 +129,7 @@ class MHSampler:
     """
     Metropolis-Hastings sampler class.
     """
-    def __init__(self, initial_h, data, kernel, burn_in, sample_count, thinning_period, report_period=500):
+    def __init__(self, initial_h, data, kernel, burn_in, sample_count, best_sample_count, thinning_period, report_period=500):
         """
         Metropolis-Hastings sampler constructor
 
@@ -116,6 +138,7 @@ class MHSampler:
         kernel: Proposal class (Proposal instance)
         burn_in: Number of burn-in iterations
         sample_count: Number of samples
+        best_sample_count: Number of highest probability samples to keep
         thinning_period: Number of samples to discard before getting the next sample
         report_period: Number of iterations to report sampler status.
         """
@@ -124,6 +147,7 @@ class MHSampler:
         self.kernel = kernel
         self.burn_in = burn_in
         self.sample_count = sample_count
+        self.best_sample_count = best_sample_count
         self.thinning_period = thinning_period
         self.report_period = report_period
         self.iter_count = burn_in + (sample_count * thinning_period) + 1
@@ -134,7 +158,7 @@ class MHSampler:
         """
         h = self.initial_h
 
-        run = MCMCRun("", self.iter_count)
+        run = MCMCRun("", self.iter_count, best_sample_count=self.best_sample_count)
         accepted_count = 0
         print("MHSampler Start\n")
         print("Initial Hypothesis\n")
@@ -174,9 +198,9 @@ class MHSampler:
                 print("Posterior probability: {0:e}".format(p_h))
                 print(h)
 
+        run.finish()
         print("Sampling finished. Acceptance ratio: {0:f}\n".format(float(accepted_count) / self.iter_count))
         return run
-
 
 
 if __name__ == "__main__":
@@ -191,7 +215,8 @@ if __name__ == "__main__":
     h = hyp.Shape(fwm)
 
     # read data (i.e., observed image) from disk
-    data = np.load('test3.npy')
+    # data = np.load('./data/stimuli20150624_144833/o1.npy')
+    data = np.load('./data/test2.npy')
     '''
     # ground truth
     parts = [hyp.CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([1.0, .75, .75])),
@@ -207,7 +232,7 @@ if __name__ == "__main__":
 
     gt = hyp.Shape(fwm, parts)
     '''
-    sampler = MHSampler(h, data, kernel, 0, 10, 20000)
+    sampler = MHSampler(h, data, kernel, 0, 10, 20, 20000)
     run = sampler.sample()
     print(run.best_samples.samples)
     print()

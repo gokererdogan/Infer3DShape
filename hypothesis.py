@@ -1,4 +1,4 @@
-'''
+"""
 Inferring 3D Shape from 2D Images
 
 This file contains the Hypothesis and related classes.
@@ -8,7 +8,7 @@ Created on Aug 27, 2015
 
 Goker Erdogan
 https://github.com/gokererdogan/
-'''
+"""
 
 import numpy as np
 import scipy.ndimage as spi
@@ -16,7 +16,9 @@ from copy import deepcopy
 import vision_forward_model as vfm
 
 ADD_OBJECT_PROB = 0.6
-LL_VARIANCE = 25.0
+# assuming that pixels ~ unif(0,1), expected variance of a pixel difference is 1/6
+LL_VARIANCE = 0.001 # in squared pixel distance
+MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
 LL_FILTER_SIGMA = 2.0
 MOVE_PART_VARIANCE = .005
 CHANGE_SIZE_VARIANCE = .005
@@ -115,17 +117,27 @@ class Shape(Hypothesis):
     Shape class defines a 3D object. It consists of a number of shape primitives
     that specify a shape.
     """
-    def __init__(self, forward_model, parts=None):
+    def __init__(self, forward_model, parts=None, part_count=None, params=None):
         self.parts = parts
         self.forward_model = forward_model
+
+        self.params = params
+        if self.params is None:
+            self.params = {'ADD_OBJECT_PROB': ADD_OBJECT_PROB, 'LL_VARIANCE': LL_VARIANCE,
+                           'MAX_PIXEL_VALUE': MAX_PIXEL_VALUE, 'LL_FILTER_SIGMA': LL_FILTER_SIGMA}
 
         # generative process: add a new part until rand()>theta (add part prob.)
         # p(H|theta) = theta^|H| (1 - theta)
         if self.parts is None:
             # randomly generate a new shape
-            self.parts = [CuboidPrimitive()]
-            while np.random.rand() < ADD_OBJECT_PROB:
-                self.parts.append(CuboidPrimitive())
+            self.parts = []
+            if part_count is not None and part_count > 0:
+                for i in range(part_count):
+                    self.parts.append(CuboidPrimitive())
+            else:
+                self.parts = [CuboidPrimitive()]
+                while np.random.rand() < self.params['ADD_OBJECT_PROB']:
+                    self.parts.append(CuboidPrimitive())
 
         Hypothesis.__init__(self) 
 
@@ -140,21 +152,35 @@ class Shape(Hypothesis):
     def likelihood(self, data):
         if self.ll is None:
             self.ll = self._ll_pixel(data)
-            # self.ll = self._ll_ground_truth(data)
         return self.ll
+
+    def convert_to_positions_sizes(self):
+        """
+        Returns the positions of parts and their sizes.
+        Used by VisionForwardModel for rendering.
+        :return: positions and sizes of parts
+        """
+        positions = []
+        sizes = []
+        for part in self.parts:
+            positions.append(part.position)
+            sizes.append(part.size)
+
+        return positions, sizes
 
     def _ll_ground_truth(self, gt):
         return np.exp(-self.distance(gt))
 
     def _ll_pixel_gaussian_filtered(self, data):
         img = self.forward_model.render(self)
-        img = spi.gaussian_filter(img, LL_FILTER_SIGMA)
-        ll = np.exp(-np.sum(np.square(img - data)) / (img.size * LL_VARIANCE))
+        img = spi.gaussian_filter(img, self.params['LL_FILTER_SIGMA'])
+        ll = np.exp(-np.sum(np.square(img - data)) / (img.size * self.params['LL_VARIANCE']))
         return ll
 
     def _ll_pixel(self, data):
         img = self.forward_model.render(self)
-        ll = np.exp(-np.sum(np.square(img - data)) / (img.size * LL_VARIANCE))
+        ll = np.exp(-np.sum(np.square((img - data) / self.params['MAX_PIXEL_VALUE']))
+                    / (img.size * 2 * self.params['LL_VARIANCE']))
         return ll
 
     def copy(self):
@@ -221,14 +247,55 @@ class Shape(Hypothesis):
 
         return dist
 
+    def to_narray(self):
+        """
+        Converts object to numpy array of length 6 * (number of parts)
+        Format: part1_pos, part1_size, part2_pos, part2_size, ...
+        """
+        arr = np.zeros((1, 6 * len(self.parts)))
+        for i, p in enumerate(self.parts):
+            arr[0, (6 * i):((6 * i) + 3)] = p.position
+            arr[0, ((6 * i) + 3):((6 * i) + 6)] = p.size
+        return arr
+
+    @staticmethod
+    def from_narray(arr, forward_model):
+        """
+        Create a Shape object from a numpy array.
+        arr contains the positions and sizes of each part.
+        It is a vector of length (number of parts) * 6; however
+        the array may in fact be larger and contain zeros.
+        Therefore, objects with zero size are ignored.
+        Format: part1_pos, part1_size, part2_pos, part2_size, ...
+        """
+        parts = []
+        maxN = int(arr.size / 6.0)
+        for i in range(maxN):
+            pos = arr[(6 * i):((6 * i) + 3)]
+            size = arr[((6 * i) + 3):((6 * i) + 6)]
+            if np.all(size>0) and np.sum(size) > 1e-6:
+                parts.append(CuboidPrimitive(position=pos, size=size))
+
+        return Shape(forward_model=forward_model, parts=parts)
+
+    def __getstate__(self):
+        # we cannot pickle VTKObjects, so get rid of them.
+        return  {k:v for k, v in self.__dict__.iteritems() if k != 'forward_model'}
+
+
+
 
 class ShapeProposal(Proposal):
     """
     ShapeProposal class implements the mixture kernel of the following moves
         add/remove part, move part, change part size
     """
-    def __init__(self):
+    def __init__(self, params=None):
         Proposal.__init__(self)
+
+        self.params = params
+        if self.params is None:
+            self.params = {'CHANGE_SIZE_VARIANCE': CHANGE_SIZE_VARIANCE, 'MOVE_PART_VARIANCE': MOVE_PART_VARIANCE}
 
     def propose(self, h, *args):
         # pick one move randomly
@@ -294,7 +361,7 @@ class ShapeProposal(Proposal):
         hp = h.copy()
         part_count = len(h.parts)
         part_id = np.random.randint(0, part_count)
-        change = np.random.randn(3) * np.sqrt(MOVE_PART_VARIANCE)
+        change = np.random.randn(3) * np.sqrt(self.params['MOVE_PART_VARIANCE'])
         # if proposed position is not out of bounds ([-1, 1])
         if np.all((hp.parts[part_id].position + change) < 1.0) and np.all((hp.parts[part_id].position + change) > -1.0):
             hp.parts[part_id].position = hp.parts[part_id].position + change
@@ -312,7 +379,7 @@ class ShapeProposal(Proposal):
         hp = h.copy()
         part_count = len(h.parts)
         part_id = np.random.randint(0, part_count)
-        change = np.random.randn(3) * np.sqrt(CHANGE_SIZE_VARIANCE)
+        change = np.random.randn(3) * np.sqrt(self.params['CHANGE_SIZE_VARIANCE'])
         # if proposed size is not out of bounds ([0, 1])
         if np.all((hp.parts[part_id].size + change) < 1.0) and np.all((hp.parts[part_id].size + change) > 0.0):
             hp.parts[part_id].size = hp.parts[part_id].size + change
@@ -343,13 +410,13 @@ if __name__ == "__main__":
     h = Shape(fwm, parts)
     # fwm._view(h)
     img = fwm.render(h)
-    np.save('test3.npy', img)
-    fwm.save_render('test3.png', h)
+    np.save('./data/test3.npy', img)
+    fwm.save_render('./data/test3.png', h)
     
     # generate shape randomly
     hr = Shape(fwm)
     # read data (i.e., observed image) from disk
-    data = np.load('test3.npy')
+    data = np.load('./data/test3.npy')
     # fwm._view(hr)
 
     print hr.likelihood(data)
