@@ -57,7 +57,7 @@ class MCMCRun:
 
     def acceptance_rate_by_move(self):
         df = self.iter_df
-        return psql.sqldf("select MoveType, AVG(IsAccepted) from df group by MoveType", env=locals())
+        return psql.sqldf("select MoveType, AVG(IsAccepted) as AcceptanceRate from df group by MoveType", env=locals())
 
     def save(self, filename):
         cPickle.dump(obj=self, file=open(filename, 'wb'), protocol=2)
@@ -129,7 +129,8 @@ class MHSampler:
     """
     Metropolis-Hastings sampler class.
     """
-    def __init__(self, initial_h, data, kernel, burn_in, sample_count, best_sample_count, thinning_period, report_period=500):
+    def __init__(self, initial_h, data, kernel, burn_in, sample_count, best_sample_count, thinning_period,
+                 report_period=500):
         """
         Metropolis-Hastings sampler constructor
 
@@ -216,7 +217,7 @@ if __name__ == "__main__":
 
     # read data (i.e., observed image) from disk
     # data = np.load('./data/stimuli20150624_144833/o1.npy')
-    data = np.load('./data/test2.npy')
+    data = np.load('./data/test3.npy')
     '''
     # ground truth
     parts = [hyp.CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([1.0, .75, .75])),
@@ -232,13 +233,18 @@ if __name__ == "__main__":
 
     gt = hyp.Shape(fwm, parts)
     '''
-    sampler = MHSampler(h, data, kernel, 0, 10, 20, 20000)
+    sampler = MHSampler(h, data, kernel, 0, 10, 20, 20000, 4000)
     run = sampler.sample()
     print(run.best_samples.samples)
     print()
     print(run.best_samples.probs)
 
+    run.save('results/shape/shape_test3.pkl')
+
+    fwm2 = vfm.VisionForwardModel(render_size=(300, 300))
+
     for i, sample in enumerate(run.samples.samples):
-        fwm.save_render("samples/s{0:d}.png".format(i), sample)
+        fwm2.save_render("results/shape/s{0:d}.png".format(i), sample)
     for i, sample in enumerate(run.best_samples.samples):
-        fwm.save_render("samples/b{0:d}.png".format(i), sample)
+        fwm2.save_render("results/shape/b{0:d}.png".format(i), sample)
+

@@ -133,20 +133,20 @@ if __name__ == "__main__":
     h = ShapeMaxN(fwm, max_part_count)
 
     # read data (i.e., observed image) from disk
-    obj_name = 'o1_t2_rp_d2'
-    data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(obj_name))
-    # data = np.load('./data/test2.npy')
+    # obj_name = 'o1_t2_rp_d2'
+    obj_name = 'test2'
+    # data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(obj_name))
+    data = np.load('./data/test2.npy')
 
-    sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 20, 20000, 2000)
+    sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 20, 20000, 4000)
     run = sampler.sample()
     print(run.best_samples.samples)
     print()
     print(run.best_samples.probs)
-    run.save('{0:s}.pkl'.format(obj_name))
+    run.save('results/shapeMaxN_{0:s}.pkl'.format(obj_name))
 
-"""
+    fwm2 = vfm.VisionForwardModel(render_size=(300, 300))
     for i, sample in enumerate(run.samples.samples):
-        fwm.save_render("samples_maxn/s{0:d}.png".format(i), sample)
+        fwm2.save_render("results/shapeMaxN/{0:s}/s{1:d}.png".format(obj_name, i), sample)
     for i, sample in enumerate(run.best_samples.samples):
-        fwm.save_render("samples_maxn/b{0:d}.png".format(i), sample)
-"""
+        fwm2.save_render("results/shapeMaxN/{0:s}/b{1:d}.png".format(obj_name, i), sample)

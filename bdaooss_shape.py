@@ -234,6 +234,8 @@ class BDAoOSSShapeMaxDProposal(hyp.Proposal):
         nodes = hp.shape.spatial_model.spatial_states.keys()
         # remove the root node
         nodes = [node for node in nodes if sm.spatial_states[node].dock_face != bdaooss.NO_FACE]
+        if len(nodes) == 0:
+            return hp, 1.0, 1.0
         node = np.random.choice(nodes)
         hp.shape.change_part_size(node)
         p_hp_h = 1.0
@@ -246,6 +248,8 @@ class BDAoOSSShapeMaxDProposal(hyp.Proposal):
         nodes = hp.shape.spatial_model.spatial_states.keys()
         # remove the root node
         nodes = [node for node in nodes if sm.spatial_states[node].dock_face != bdaooss.NO_FACE]
+        if len(nodes) == 0:
+            return hp, 1.0, 1.0
         node = np.random.choice(nodes)
         change = np.random.randn(3) * np.sqrt(self.params['CHANGE_SIZE_VARIANCE'])
         # if proposed size is not out of bounds ([0, 1])
