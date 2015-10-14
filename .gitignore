@@ -1,4 +1,6 @@
 *.png
+*.csv
+*.pkl
 .idea/
 data/stimuli*/
 results/

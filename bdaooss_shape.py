@@ -266,6 +266,8 @@ class BDAoOSSShapeMaxDProposal(hyp.Proposal):
         nodes = hp.shape.spatial_model.spatial_states.keys()
         # remove the root node and any node with no empty faces
         nodes = [node for node in nodes if sm.spatial_states[node].dock_face != bdaooss.NO_FACE]
+        if len(nodes) == 0:
+            return hp, 1.0, 1.0
         node = np.random.choice(nodes)
         hp.shape.change_part_dock_face(node)
         p_hp_h = 1.0

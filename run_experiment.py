@@ -11,6 +11,7 @@ https://github.com/gokererdogan/
 """
 
 import gmllib.experiment as exp
+import os
 
 def run_chain(input_file, results_folder, max_depth, ll_variance, max_pixel_value, change_size_variance,
               burn_in, sample_count, best_sample_count, thinning_period, report_period):
@@ -44,7 +45,7 @@ def run_chain(input_file, results_folder, max_depth, ll_variance, max_pixel_valu
     h = bdaooss.BDAoOSSShapeMaxD(forward_model=fwm, max_depth=max_depth, params=params)
 
     # read data (i.e., observed image) from disk
-    data = np.load("./data/{0:s}.npy".format(input_file))
+    data = np.load("./data/stimuli20150624_144833/{0:s}.npy".format(input_file))
 
     sampler = mcmc.MHSampler(h, data, kernel, burn_in=burn_in, sample_count=sample_count,
                              best_sample_count=best_sample_count, thinning_period=thinning_period,
@@ -56,7 +57,7 @@ def run_chain(input_file, results_folder, max_depth, ll_variance, max_pixel_valu
     run.save("{0:s}/{1:s}.pkl".format(results_folder, input_file))
 
     fwm2 = vfm.VisionForwardModel(render_size=(300, 300))
-
+    os.mkdir("{0:s}/{1:s}".format(results_folder, input_file))
     for i, sample in enumerate(run.samples.samples):
         fwm2.save_render("{0:s}/{1:s}/s{2:d}.png".format(results_folder, input_file, i), sample)
     for i, sample in enumerate(run.best_samples.samples):
@@ -79,14 +80,16 @@ def run_chain(input_file, results_folder, max_depth, ll_variance, max_pixel_valu
 
 if __name__ == "__main__":
     import hypothesis as hyp
-    experiment = exp.Experiment(name="TestObjectsBDAoOSSShapeMaxD", experiment_method=run_chain,
-                                input_file=['test1', 'test2', 'test3'], results_folder='./results/bdaoossShapeMaxD',
+    experiment = exp.Experiment(name="o3", experiment_method=run_chain,
+                                input_file=['o2_t1_cs_d2', 'o3', 'o3_t1_cs_d1', 'o3_t1_cs_d2',
+                                            'o3_t2_ap_d1', 'o3_t2_ap_d2', 'o3_t2_mf_d1', 'o3_t2_mf_d2',
+                                            'o3_t2_rp_d1', 'o3_t2_rp_d2'], results_folder='./results/bdaoossShapeMaxD',
                                 max_depth=3, ll_variance=hyp.LL_VARIANCE, max_pixel_value=hyp.MAX_PIXEL_VALUE,
                                 change_size_variance=hyp.CHANGE_SIZE_VARIANCE,
                                 burn_in=0, sample_count=10, best_sample_count=20, thinning_period=20000,
                                 report_period=10000)
 
-    experiment.run(parallel=True, num_processes=3)
+    experiment.run(parallel=True, num_processes=10)
 
     print(experiment.results)
     experiment.save()
