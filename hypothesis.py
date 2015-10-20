@@ -22,6 +22,10 @@ MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the l
 LL_FILTER_SIGMA = 2.0
 MOVE_PART_VARIANCE = .005
 CHANGE_SIZE_VARIANCE = .005
+# the default viewpoint(s) for an object
+DEFAULT_VIEWPOINT = [(3.0, -3.0, 3.0)]
+# in degrees
+CHANGE_VIEWPOINT_VARIANCE = 60.0
 
 class Hypothesis:
     """
@@ -117,7 +121,7 @@ class Shape(Hypothesis):
     Shape class defines a 3D object. It consists of a number of shape primitives
     that specify a shape.
     """
-    def __init__(self, forward_model, parts=None, part_count=None, params=None):
+    def __init__(self, forward_model, parts=None, viewpoint=None, part_count=None, params=None):
         self.parts = parts
         self.forward_model = forward_model
 
@@ -125,6 +129,11 @@ class Shape(Hypothesis):
         if self.params is None:
             self.params = {'ADD_PART_PROB': ADD_PART_PROB, 'LL_VARIANCE': LL_VARIANCE,
                            'MAX_PIXEL_VALUE': MAX_PIXEL_VALUE, 'LL_FILTER_SIGMA': LL_FILTER_SIGMA}
+
+        # this is the point from which we look at the object.
+        # it is a list of 3-tuples, each 3-tuple specifying one viewpoint (x,y,z).
+        # if this is not provided, camera_pos defined by forward_model is used.
+        self.viewpoint = viewpoint
 
         # generative process: add a new part until rand()>theta (add part prob.)
         # p(H|theta) = theta^|H| (1 - theta)
@@ -189,7 +198,9 @@ class Shape(Hypothesis):
         """
         self_copy = Shape(self.forward_model)
         parts_copy = deepcopy(self.parts)
+        viewpoint_copy = deepcopy(self.viewpoint)
         self_copy.parts = parts_copy
+        self_copy.viewpoint = viewpoint_copy
         return self_copy
 
     def __str__(self):
@@ -290,16 +301,23 @@ class ShapeProposal(Proposal):
     ShapeProposal class implements the mixture kernel of the following moves
         add/remove part, move part, change part size
     """
-    def __init__(self, params=None):
+    def __init__(self, allow_viewpoint_update=False, params=None):
         Proposal.__init__(self)
+
+        self.allow_viewpoint_update = allow_viewpoint_update
 
         self.params = params
         if self.params is None:
-            self.params = {'CHANGE_SIZE_VARIANCE': CHANGE_SIZE_VARIANCE, 'MOVE_PART_VARIANCE': MOVE_PART_VARIANCE}
+            self.params = {'CHANGE_SIZE_VARIANCE': CHANGE_SIZE_VARIANCE, 'MOVE_PART_VARIANCE': MOVE_PART_VARIANCE,
+                           'CHANGE_VIEWPOINT_VARIANCE': CHANGE_VIEWPOINT_VARIANCE}
 
     def propose(self, h, *args):
         # pick one move randomly
-        i = np.random.randint(0, 5)
+        if self.allow_viewpoint_update:
+            i = np.random.randint(0, 6)
+        else:
+            i = np.random.randint(0, 5)
+
         if i == 0:
             info = "add/remove part"
             hp, q_hp_h, q_h_hp = self.add_remove_part(h)
@@ -312,9 +330,13 @@ class ShapeProposal(Proposal):
         elif i == 3:
             info = "change size local"
             hp, q_hp_h, q_h_hp = self.change_part_size_local(h)
-        else:
+        elif i == 4:
             info = "change size"
             hp, q_hp_h, q_h_hp = self.change_part_size(h)
+        elif i == 5:
+            info = "change viewpoint"
+            hp, q_hp_h, q_h_hp = self.change_viewpoint(h)
+
         return info, hp, q_hp_h, q_h_hp
 
     def add_remove_part(self, h):
@@ -385,9 +407,31 @@ class ShapeProposal(Proposal):
             hp.parts[part_id].size = hp.parts[part_id].size + change
         return hp, 1.0, 1.0
 
+    def change_viewpoint(self, h):
+        hp = h.copy()
+        # we rotate viewpoint around z axis, keeping the distance to the origin fixed.
+        # default viewpoint is (3.0, -3.0, 3.0)
+        # add random angle
+        change = np.random.randn() * np.sqrt(self.params['CHANGE_VIEWPOINT_VARIANCE'])
+        for i, viewpoint in enumerate(hp.viewpoint):
+            x = viewpoint[0]
+            y = viewpoint[1]
+            z = viewpoint[2]
+            d = np.sqrt(x**2 + y**2)
+            # calculate angle
+            angle = ((180.0 * np.arctan2(y, x) / np.pi) + 360.0) % 360.0
+            angle = (angle + change) % 360.0
+            nx = d * np.cos(angle * np.pi / 180.0)
+            ny = d * np.sin(angle * np.pi / 180.0)
+            hp.viewpoint[i] = (nx, ny, z)
+
+        return hp, 1.0, 1.0
+
+
+
 
 if __name__ == "__main__":
-    fwm = vfm.VisionForwardModel()
+    fwm = vfm.VisionForwardModel(render_size=(200, 200))
     # generate a test object
     # test 1
     parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([1.0, .75, .75])),
@@ -407,16 +451,22 @@ if __name__ == "__main__":
              CuboidPrimitive(np.array([-0.5, 0.0, 0.3]), np.array([0.6, 0.6, 0.6])),
              CuboidPrimitive(np.array([-0.5, -0.5, 0.4]), np.array([0.2, 0.4, 0.2]))]
 
-    h = Shape(fwm, parts)
+    angle = np.random.randint(0, 360)
+    print(angle)
+    x = 3.0 * np.sqrt(2.0) * np.cos(angle / 180.0 * np.pi)
+    y = 3.0 * np.sqrt(2.0) * np.sin(angle / 180.0 * np.pi)
+    viewpoint = [(x, y, 3.0)]
+
+    h = Shape(fwm, parts=parts, viewpoint=viewpoint)
     # fwm._view(h)
     img = fwm.render(h)
-    np.save('./data/test3.npy', img)
-    fwm.save_render('./data/test3.png', h)
+    np.save('./data/test3_single_view.npy', img)
+    fwm.save_render('./data/test3_single_view.png', h)
     
     # generate shape randomly
-    hr = Shape(fwm)
+    hr = Shape(fwm, viewpoint=viewpoint)
     # read data (i.e., observed image) from disk
-    data = np.load('./data/test3.npy')
+    data = np.load('./data/test3_single_view.npy')
     # fwm._view(hr)
 
     print hr.likelihood(data)

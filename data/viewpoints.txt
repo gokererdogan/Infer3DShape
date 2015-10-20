@@ -1,0 +1,4 @@
+# viewpoints for test objects (angle wrt to x axis, [0,360))
+test1	262
+test2	296
+test3	7

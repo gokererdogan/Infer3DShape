@@ -9,6 +9,7 @@ Goker Erdogan
 https://github.com/gokererdogan/
 """
 import numpy as np
+from copy import deepcopy
 
 import BDAoOSS.bdaooss_grammar as bdaooss
 import hypothesis as hyp
@@ -18,7 +19,7 @@ class BDAoOSSShapeMaxD(hyp.Hypothesis):
     """
 
     """
-    def __init__(self, forward_model, shape=None, max_depth=3, params=None):
+    def __init__(self, forward_model, shape=None, viewpoint=None, max_depth=3, params=None):
         """
         Initialize BDAoOSSShapeMaxD instance
         :param forward_model: Instance of VisionForwardModel used for rendering
@@ -27,6 +28,8 @@ class BDAoOSSShapeMaxD(hyp.Hypothesis):
         """
         self.forward_model = forward_model
         self.max_depth = max_depth
+        self.viewpoint = viewpoint
+
         self.shape = shape
         if self.shape is None:
             sm = bdaooss.BDAoOSSSpatialModel(size_prior=bdaooss.size_prior_infer3dshape)
@@ -34,7 +37,7 @@ class BDAoOSSShapeMaxD(hyp.Hypothesis):
 
         self.params = params
         if self.params is None:
-            self.params = {'ADD_OBJECT_PROB': hyp.ADD_OBJECT_PROB, 'LL_VARIANCE': hyp.LL_VARIANCE,
+            self.params = {'ADD_OBJECT_PROB': hyp.ADD_PART_PROB, 'LL_VARIANCE': hyp.LL_VARIANCE,
                            'MAX_PIXEL_VALUE': hyp.MAX_PIXEL_VALUE, 'LL_FILTER_SIGMA': hyp.LL_FILTER_SIGMA}
 
         hyp.Hypothesis.__init__(self)
@@ -68,8 +71,9 @@ class BDAoOSSShapeMaxD(hyp.Hypothesis):
 
     def copy(self):
         shape_copy = self.shape.copy()
+        viewpoint_copy = deepcopy(self.viewpoint)
         return BDAoOSSShapeMaxD(forward_model=self.forward_model, shape=shape_copy, params=self.params,
-                                max_depth=self.max_depth)
+                                max_depth=self.max_depth, viewpoint=viewpoint_copy)
 
     def __str__(self):
         return str(self.shape)
@@ -86,16 +90,23 @@ class BDAoOSSShapeMaxDProposal(hyp.Proposal):
     Proposal class that implements the mixture kernel of the following moves
         add/remove part, change docking face, change part size
     """
-    def __init__(self, params=None):
+    def __init__(self, allow_viewpoint_update=False, params=None):
         hyp.Proposal.__init__(self)
+
+        self.allow_viewpoint_update = allow_viewpoint_update
 
         self.params = params
         if self.params is None:
-            self.params = {'CHANGE_SIZE_VARIANCE': hyp.CHANGE_SIZE_VARIANCE}
+            self.params = {'CHANGE_SIZE_VARIANCE': hyp.CHANGE_SIZE_VARIANCE,
+                           'CHANGE_VIEWPOINT_VARIANCE': hyp.CHANGE_VIEWPOINT_VARIANCE}
 
     def propose(self, h, *args):
         # pick one move randomly
-        i = np.random.randint(0, 4)
+        if self.allow_viewpoint_update:
+            i = np.random.randint(0, 5)
+        else:
+            i = np.random.randint(0, 4)
+
         if i == 0:
             info = "add/remove part"
             hp, q_hp_h, q_h_hp = self.add_remove_part(h)
@@ -105,13 +116,17 @@ class BDAoOSSShapeMaxDProposal(hyp.Proposal):
         elif i == 2:
             info = "change part size local"
             hp, q_hp_h, q_h_hp = self.change_part_size_local(h)
-        else:
+        elif i == 3:
             info = "change part dock face"
             hp, q_hp_h, q_h_hp = self.change_part_dock_face(h)
+        elif i == 4:
+            info = "change viewpoint"
+            hp, q_hp_h, q_h_hp = self.change_viewpoint(h)
+
         return info, hp, q_hp_h, q_h_hp
 
     def add_remove_part(self, h):
-        # REMEMBER tha we allow trees of depth D and our grammar allows P nodes
+        # REMEMBER that we allow trees of depth D and our grammar allows P nodes
         # to have at most 3 children.
         # we can add nodes under the P nodes that have less than 3 children and are not at depth D
         # we can remove P nodes that have a single child Null
@@ -274,32 +289,48 @@ class BDAoOSSShapeMaxDProposal(hyp.Proposal):
         p_h_hp = 1.0
         return hp, p_hp_h, p_h_hp
 
+    def change_viewpoint(self, h):
+        hp = h.copy()
+        # we rotate viewpoint around z axis, keeping the distance to the origin fixed.
+        # default viewpoint is (3.0, -3.0, 3.0)
+        # add random angle
+        change = np.random.randn() * np.sqrt(self.params['CHANGE_VIEWPOINT_VARIANCE'])
+        for i, viewpoint in enumerate(hp.viewpoint):
+            x = viewpoint[0]
+            y = viewpoint[1]
+            z = viewpoint[2]
+            d = np.sqrt(x**2 + y**2)
+            # calculate angle
+            angle = ((180.0 * np.arctan2(y, x) / np.pi) + 360.0) % 360.0
+            angle = (angle + change) % 360.0
+            nx = d * np.cos(angle * np.pi / 180.0)
+            ny = d * np.sin(angle * np.pi / 180.0)
+            hp.viewpoint[i] = (nx, ny, z)
 
+        return hp, 1.0, 1.0
 
 if __name__ == "__main__":
     import vision_forward_model as vfm
     import mcmc_sampler as mcmc
-    fwm = vfm.VisionForwardModel()
-    kernel = BDAoOSSShapeMaxDProposal()
+    fwm = vfm.VisionForwardModel(render_size=(200, 200))
+    kernel = BDAoOSSShapeMaxDProposal(allow_viewpoint_update=True)
 
     # generate initial hypothesis shape randomly
-    h = BDAoOSSShapeMaxD(fwm, max_depth=3)
+    h = BDAoOSSShapeMaxD(fwm, max_depth=3, viewpoint=[(3.0, -3.0, 3.0)])
 
     # read data (i.e., observed image) from disk
-    obj_name = 'o1'
-    data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(obj_name))
-    # data = np.load('./data/test2.npy')
+    obj_name = 'test1'
+    # data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(obj_name))
+    data = np.load('./data/test1_single_view.npy')
 
-    sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 20, 10000, 2000)
+    sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 20, 200, 400)
     run = sampler.sample()
     print(run.best_samples.samples)
     print()
     print(run.best_samples.probs)
-    run.save('bdaoossMax3_{0:s}.pkl'.format(obj_name))
+    # run.save('bdaoossMax3_{0:s}.pkl'.format(obj_name))
 
-"""
     for i, sample in enumerate(run.samples.samples):
-        fwm.save_render("samples_maxn/s{0:d}.png".format(i), sample)
+        fwm.save_render("results/bdaoossShapeMaxD/{0:s}/s{1:d}.png".format(obj_name, i), sample)
     for i, sample in enumerate(run.best_samples.samples):
-        fwm.save_render("samples_maxn/b{0:d}.png".format(i), sample)
-"""
+        fwm.save_render("results/bdaoossShapeMaxD/{0:s}/b{1:d}.png".format(obj_name, i), sample)

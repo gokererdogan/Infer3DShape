@@ -14,9 +14,9 @@ import gmllib.experiment as exp
 import os
 import warnings
 
-def run_chain(input_file, results_folder, data_folder, hypothesis_class, max_part_count, max_depth, add_part_prob,
-              ll_variance, max_pixel_value, change_size_variance, move_part_variance,
-              burn_in, sample_count, best_sample_count, thinning_period, report_period):
+def run_chain(input_file, results_folder, data_folder, hypothesis_class, single_view, render_size, max_part_count,
+              max_depth, add_part_prob, ll_variance, max_pixel_value, change_size_variance, change_viewpoint_variance,
+              move_part_variance, burn_in, sample_count, best_sample_count, thinning_period, report_period):
     """
     This method runs the chain with the given parameters, saves the results and returns a summary of the results.
     This method is intended to be used in an Experiment instance.
@@ -37,28 +37,39 @@ def run_chain(input_file, results_folder, data_folder, hypothesis_class, max_par
     import mcmc_sampler as mcmc
     import vision_forward_model as vfm
     import numpy as np
-    fwm = vfm.VisionForwardModel()
+    fwm = vfm.VisionForwardModel(render_size=render_size)
 
     shape_params = {'ADD_PART_PROB': add_part_prob, 'LL_VARIANCE': ll_variance, 'MAX_PIXEL_VALUE': max_pixel_value}
-    kernel_params = {'CHANGE_SIZE_VARIANCE': change_size_variance, 'MOVE_PART_VARIANCE': move_part_variance}
+    kernel_params = {'CHANGE_SIZE_VARIANCE': change_size_variance, 'MOVE_PART_VARIANCE': move_part_variance,
+                     'CHANGE_VIEWPOINT_VARIANCE': change_viewpoint_variance}
+
+    if single_view:
+        viewpoint = [(3.0, -3.0, 3.0)]
+        allow_viewpoint_update = True
+    else:
+        viewpoint = None
+        allow_viewpoint_update = False
 
     if hypothesis_class == 'shape':
         import hypothesis as hyp
-        h = hyp.Shape(forward_model=fwm, params=shape_params)
-        kernel = hyp.ShapeProposal(params=kernel_params)
+        h = hyp.Shape(forward_model=fwm, viewpoint=viewpoint, params=shape_params)
+        kernel = hyp.ShapeProposal(allow_viewpoint_update=allow_viewpoint_update, params=kernel_params)
     elif hypothesis_class == 'shapeMaxN':
         import shape_maxn
-        h = shape_maxn.ShapeMaxN(forward_model=fwm, maxn=max_part_count, params=shape_params)
-        kernel = shape_maxn.ShapeMaxNProposal(params=kernel_params)
+        h = shape_maxn.ShapeMaxN(forward_model=fwm, maxn=max_part_count, viewpoint=viewpoint, params=shape_params)
+        kernel = shape_maxn.ShapeMaxNProposal(allow_viewpoint_update=allow_viewpoint_update, params=kernel_params)
     elif hypothesis_class == 'bdaoossShapeMaxD':
         import bdaooss_shape as bdaooss
-        h = bdaooss.BDAoOSSShapeMaxD(forward_model=fwm, max_depth=max_depth, params=shape_params)
-        kernel = bdaooss.BDAoOSSShapeMaxDProposal(params=kernel_params)
+        h = bdaooss.BDAoOSSShapeMaxD(forward_model=fwm, max_depth=max_depth, viewpoint=viewpoint, params=shape_params)
+        kernel = bdaooss.BDAoOSSShapeMaxDProposal(allow_viewpoint_update=allow_viewpoint_update, params=kernel_params)
     else:
         raise Exception("Unknown hypothesis class.")
 
     # read data (i.e., observed image) from disk
-    data = np.load("{0:s}/{1:s}.npy".format(data_folder, input_file))
+    s = ""
+    if single_view:
+        s = "_single_view"
+    data = np.load("{0:s}/{1:s}{2:s}.npy".format(data_folder, input_file, s))
 
     sampler = mcmc.MHSampler(h, data, kernel, burn_in=burn_in, sample_count=sample_count,
                              best_sample_count=best_sample_count, thinning_period=thinning_period,
@@ -96,27 +107,29 @@ def run_chain(input_file, results_folder, data_folder, hypothesis_class, max_par
 
 if __name__ == "__main__":
     ADD_PART_PROB = 0.6
-    LL_VARIANCE = 0.005 # in squared pixel distance
+    LL_VARIANCE = 0.001 # in squared pixel distance
     MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
     LL_FILTER_SIGMA = 2.0
     MOVE_PART_VARIANCE = .005
-    CHANGE_SIZE_VARIANCE = .020
+    CHANGE_SIZE_VARIANCE = .040
+    CHANGE_VIEWPOINT_VARIANCE = 60.0
 
-    experiment = exp.Experiment(name="TestObjects", experiment_method=run_chain,
-                                hypothesis_class=['bdaoossShapeMaxD'],
+    experiment = exp.Experiment(name="TestObjects_SingleView", experiment_method=run_chain, single_view=True,
+                                hypothesis_class=['shape', 'shapeMaxN', 'bdaoossShapeMaxD'],
                                 input_file=['test1', 'test2', 'test3'], results_folder='./results',
-                                data_folder='./data',
+                                data_folder='./data', render_size=(200, 200),
                                 max_part_count=8, max_depth=3,
                                 add_part_prob=ADD_PART_PROB, ll_variance=LL_VARIANCE,
                                 max_pixel_value=MAX_PIXEL_VALUE,
                                 change_size_variance=CHANGE_SIZE_VARIANCE,
+                                change_viewpoint_variance=CHANGE_VIEWPOINT_VARIANCE,
                                 move_part_variance=MOVE_PART_VARIANCE,
                                 burn_in=0, sample_count=10, best_sample_count=20, thinning_period=20000,
                                 report_period=10000)
 
-    experiment.run(parallel=True, num_processes=3)
+    experiment.run(parallel=True, num_processes=9)
 
     print(experiment.results)
     experiment.save('./results')
-    experiment.append_csv('./results/TestObjects.csv')
+    experiment.append_csv('./results/TestObjects_SingleView.csv')
 

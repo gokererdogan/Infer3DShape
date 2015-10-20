@@ -115,7 +115,7 @@ class VisionForwardModel:
         self.vtkcamera.SetFocalPoint(0, 0, 0)
         self.vtkcamera.SetViewUp(self.camera_up)
  
-    def render(self, shape, for_save=False):
+    def render(self, shape):
         """
         Construct the 3D object from Shape instance and render it.
         Returns numpy array with size number of viewpoints x self.render_size
@@ -123,9 +123,13 @@ class VisionForwardModel:
         self._build_scene(shape)
         w = self.render_size[0]
         h = self.render_size[1]
-        img_arr = np.zeros((self.camera_view_count, w, h))
-        for i, camera_pos in enumerate(self.camera_pos):
-            self.vtkcamera.SetPosition(camera_pos)
+        # if shape has viewpoint defined, use that
+        camera_pos = self.camera_pos
+        if shape.viewpoint is not None:
+            camera_pos = shape.viewpoint
+        img_arr = np.zeros((len(camera_pos), w, h))
+        for i, pos in enumerate(camera_pos):
+            self.vtkcamera.SetPosition(pos)
             img_arr[i, :, :] = self._render_window_to2D()
         return img_arr
     
@@ -196,7 +200,6 @@ class VisionForwardModel:
         self.vtkobj_exporter.SetFilePrefix(filename)
         self.vtkobj_exporter.Write()
 
-
     def _save_stl(self, filename, shape):
         """
         Save object to stl file.
@@ -215,7 +218,7 @@ class VisionForwardModel:
         ext = fp[-1]
         img = self.render(shape)
         # make sure that scipy does not normalize the image
-        for i in range(self.camera_view_count):
+        for i in range(img.shape[0]):
             simg = scipy.misc.toimage(np.flipud(img[i]), cmin=0, cmax=255)
             simg.save("{0:s}_{1:d}.{2:s}".format(fn, i, ext))
 

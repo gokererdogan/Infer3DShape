@@ -207,17 +207,17 @@ class MHSampler:
 if __name__ == "__main__":
     import vision_forward_model as vfm
     import hypothesis as hyp
-    fwm = vfm.VisionForwardModel()
-    kernel = hyp.ShapeProposal()
+    fwm = vfm.VisionForwardModel(render_size=(200, 200))
+    kernel = hyp.ShapeProposal(allow_viewpoint_update=True)
 
     # generate initial hypothesis shape randomly
     # parts = [hyp.CuboidPrimitive(np.array([0, 0, 0]), np.array([1.0, 0.75, 0.75]))]
     # h = hyp.Shape(fwm, parts=parts)
-    h = hyp.Shape(fwm)
+    h = hyp.Shape(fwm, viewpoint=[(3.0, -3.0, 3.0)])
 
     # read data (i.e., observed image) from disk
     # data = np.load('./data/stimuli20150624_144833/o1.npy')
-    data = np.load('./data/test3.npy')
+    data = np.load('./data/test1_single_view.npy')
     '''
     # ground truth
     parts = [hyp.CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([1.0, .75, .75])),
@@ -233,18 +233,16 @@ if __name__ == "__main__":
 
     gt = hyp.Shape(fwm, parts)
     '''
-    sampler = MHSampler(h, data, kernel, 0, 10, 20, 20000, 4000)
+    sampler = MHSampler(h, data, kernel, 0, 10, 20, 200, 400)
     run = sampler.sample()
     print(run.best_samples.samples)
     print()
     print(run.best_samples.probs)
 
-    run.save('results/shape/shape_test3.pkl')
-
-    fwm2 = vfm.VisionForwardModel(render_size=(300, 300))
+    # run.save('results/shape/shape_test3.pkl')
 
     for i, sample in enumerate(run.samples.samples):
-        fwm2.save_render("results/shape/s{0:d}.png".format(i), sample)
+        fwm.save_render("results/shape/test1/s{0:d}.png".format(i), sample)
     for i, sample in enumerate(run.best_samples.samples):
-        fwm2.save_render("results/shape/b{0:d}.png".format(i), sample)
+        fwm.save_render("results/shape/test1/b{0:d}.png".format(i), sample)
 
