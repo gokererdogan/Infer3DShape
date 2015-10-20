@@ -13,6 +13,8 @@ import hypothesis as hyp
 import vision_forward_model as vfm
 import numpy as np
 
+hyp.LL_VARIANCE = 0.005
+
 fwm = vfm.VisionForwardModel()
 
 # test object 1

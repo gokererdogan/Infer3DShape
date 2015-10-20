@@ -7,31 +7,34 @@ https://gitub.com/gokererdogan
 """
 
 import numpy as np
-np.random.seed(1234)
+import gmllib.dataset as dataset
+
 
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation
 from keras.optimizers import SGD, Adagrad
 from keras.callbacks import EarlyStopping
 
-model = Sequential()
-model.add(Dense(100*100*5, 1000, init='uniform'))
-model.add(Activation('tanh'))
-model.add(Dropout(0.5))
-model.add(Dense(1000, 1000, init='uniform'))
-model.add(Activation('tanh'))
-model.add(Dropout(0.5))
-model.add(Dense(1000, 8*6, init='uniform'))
+np.random.seed(1234)
 
-sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
-# ada = Adagrad()
-model.compile(loss='mean_squared_error', optimizer=sgd)
+model = Sequential()
+model.add(Dense(input_dim=(50*50), output_dim=1000))
+model.add(Activation('tanh'))
+model.add(Dropout(0.5))
+model.add(Dense(input_dim=1000, output_dim=(5*3)))
+
+# sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
+ada = Adagrad()
+model.compile(loss='mean_squared_error', optimizer=ada)
+
+# load dataset
+ds = dataset.DataSet.load_from_path('5 part, fixed size', folder='data/5_part_fixed_size')
 
 early_stopping = EarlyStopping(monitor='val_loss', patience=2)
-model.fit(x_train, y_train, validation_split=0.2, nb_epoch=20, batch_size=20, callbacks=[early_stopping], verbose=True)
-score = model.evaluate(x_test, y_test, batch_size=20)
+model.fit(ds.train.x, ds.train.y, validation_split=0.2, nb_epoch=20, batch_size=128, callbacks=[early_stopping], verbose=True)
+score = model.evaluate(ds.test.x, ds.test.y)
 print(score)
-pred = model.predict(x_test)
+pred = model.predict(ds.test.x)
 
 """
 import hypothesis as hyp

@@ -9,13 +9,11 @@ Goker Erdogan
 https://github.com/gokererdogan/
 """
 
-import numpy as np
 import pandas as pd
 import pandasql as psql
 import cPickle as pkl
 
 from shape_maxn import *
-# from mcmc_sampler import *
 import vision_forward_model as vfm
 
 def calculate_prob(data, samples, probs):
@@ -41,35 +39,42 @@ def calculate_prob(data, samples, probs):
 if __name__ == "__main__":
     fwm = vfm.VisionForwardModel()
 
+    data_folder = "./data/stimuli20150624_144833"
+    samples_folder = "./results/bdaoossShapeMaxD"
+
     df = pd.DataFrame(index=np.arange(0, 8), columns=['Target', 'Comparison', 'p_comp_target', 'p_target_comp'])
 
-    # load the target object data and samples
-    obj = 'o1'
-    obj_run = pkl.load(open("{0:s}.pkl".format(obj)))
-    obj_data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(obj))
+    objects = ['o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'o8', 'o9', 'o10']
+    transformations = ['t1_cs_d1', 't1_cs_d2', 't2_ap_d1', 't2_ap_d2', 't2_mf_d1', 't2_mf_d2', 't2_rp_d1', 't2_rp_d2']
 
-    obj_best_samples = obj_run.best_samples.samples
-    for sample in obj_best_samples:
-        sample.forward_model = fwm
+    i = 0
+    for obj in objects:
+        print(obj)
+        # load the target object data and samples
+        obj_run = pkl.load(open("{0:s}/{1:s}.pkl".format(samples_folder, obj)))
+        obj_data = np.load('{0:s}/{1:s}.npy'.format(data_folder, obj))
 
-    obj_probs = obj_run.best_samples.probs
-
-    comparisons = ['o1_t1_cs_d1', 'o1_t1_cs_d2', 'o1_t2_ap_d1', 'o1_t2_ap_d2',
-                   'o1_t2_mf_d1', 'o1_t2_mf_d2', 'o1_t2_rp_d1', 'o1_t2_rp_d2']
-
-    for i, comparison in enumerate(comparisons):
-        comp_run = pkl.load(open("{0:s}.pkl".format(comparison)))
-        comp_data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(comparison))
-
-        comp_best_samples = comp_run.best_samples.samples
-        for sample in comp_best_samples:
+        obj_best_samples = obj_run.best_samples.samples
+        for sample in obj_best_samples:
             sample.forward_model = fwm
 
-        comp_probs = comp_run.best_samples.probs
+        obj_probs = obj_run.best_samples.probs
 
-        p_comp_target = calculate_prob(comp_data, obj_best_samples, obj_probs)
-        p_target_comp = calculate_prob(obj_data, comp_best_samples, comp_probs)
-        df.loc[i] = [obj, comparison, p_comp_target, p_target_comp]
+        for transformation in transformations:
+            comparison = "{0:s}_{1:s}".format(obj, transformation)
+            comp_run = pkl.load(open("{0:s}/{1:s}.pkl".format(samples_folder, comparison)))
+            comp_data = np.load('{0:s}/{1:s}.npy'.format(data_folder, comparison))
+
+            comp_best_samples = comp_run.best_samples.samples
+            for sample in comp_best_samples:
+                sample.forward_model = fwm
+
+            comp_probs = comp_run.best_samples.probs
+
+            p_comp_target = calculate_prob(comp_data, obj_best_samples, obj_probs)
+            p_target_comp = calculate_prob(obj_data, comp_best_samples, comp_probs)
+            df.loc[i] = [obj, comparison, p_comp_target, p_target_comp]
+            i += 1
 
     # calculate model predictions
     predictions = psql.sqldf("select d1.Comparison as Comparison1, d2.Comparison as Comparison2, "

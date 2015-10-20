@@ -15,7 +15,7 @@ import scipy.ndimage as spi
 from copy import deepcopy
 import vision_forward_model as vfm
 
-ADD_OBJECT_PROB = 0.6
+ADD_PART_PROB = 0.6
 # assuming that pixels ~ unif(0,1), expected variance of a pixel difference is 1/6
 LL_VARIANCE = 0.001 # in squared pixel distance
 MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
@@ -123,7 +123,7 @@ class Shape(Hypothesis):
 
         self.params = params
         if self.params is None:
-            self.params = {'ADD_OBJECT_PROB': ADD_OBJECT_PROB, 'LL_VARIANCE': LL_VARIANCE,
+            self.params = {'ADD_PART_PROB': ADD_PART_PROB, 'LL_VARIANCE': LL_VARIANCE,
                            'MAX_PIXEL_VALUE': MAX_PIXEL_VALUE, 'LL_FILTER_SIGMA': LL_FILTER_SIGMA}
 
         # generative process: add a new part until rand()>theta (add part prob.)
@@ -136,7 +136,7 @@ class Shape(Hypothesis):
                     self.parts.append(CuboidPrimitive())
             else:
                 self.parts = [CuboidPrimitive()]
-                while np.random.rand() < self.params['ADD_OBJECT_PROB']:
+                while np.random.rand() < self.params['ADD_PART_PROB']:
                     self.parts.append(CuboidPrimitive())
 
         Hypothesis.__init__(self) 

@@ -18,18 +18,22 @@ class ShapeMaxN(Shape):
     """
     ShapeMaxN class defines a 3D object with maximum N parts.
     """
-    def __init__(self, forward_model, maxn=6, parts=None):
+    def __init__(self, forward_model, maxn=6, parts=None, params=None):
         self.maxn = maxn
+
+        add_part_prob = ADD_PART_PROB
+        if params is not None and 'ADD_PART_PROB' in params.keys():
+            add_part_prob = params['ADD_PART_PROB']
 
         # generative process: add a new part until rand()>theta (add part prob.)
         # p(H|theta) = theta^|H| (1 - theta)
         if parts is None:
             # randomly generate a new shape
             parts = [CuboidPrimitive()]
-            while (np.random.rand() < ADD_OBJECT_PROB) and (len(parts) < self.maxn):
+            while (np.random.rand() < add_part_prob) and (len(parts) < self.maxn):
                 parts.append(CuboidPrimitive())
 
-        Shape.__init__(self, forward_model, parts)
+        Shape.__init__(self, forward_model, parts, params=params)
 
     def prior(self):
         if self.p is None:
@@ -54,10 +58,10 @@ class ShapeMaxNProposal(ShapeProposal):
     for the ShapeMaxN class.
         add/remove part, move part, change part size
     """
-    def __init__(self, allow_add_remove=True):
+    def __init__(self, allow_add_remove=True, params=None):
         # do we allow add/remove part move?
         self.allow_add_remove = allow_add_remove
-        ShapeProposal.__init__(self)
+        ShapeProposal.__init__(self, params=params)
 
     def propose(self, h, *args):
         # pick one move randomly
