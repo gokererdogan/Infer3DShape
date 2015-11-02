@@ -46,7 +46,9 @@ class ShapeMaxN(Shape):
         """
         Returns a (deep) copy of the instance
         """
-        self_copy = ShapeMaxN(forward_model=self.forward_model, maxn=self.maxn)
+        # NOTE that we are not copying params. This assumes that
+        # params are not changing from hypothesis to hypothesis.
+        self_copy = ShapeMaxN(forward_model=self.forward_model, maxn=self.maxn, params=self.params)
         parts_copy = deepcopy(self.parts)
         viewpoint_copy = deepcopy(self.viewpoint)
         self_copy.parts = parts_copy
@@ -68,12 +70,12 @@ class ShapeMaxNProposal(ShapeProposal):
     def propose(self, h, *args):
         # pick one move randomly
         lb = 1
-        ub = 5
+        ub = 6
         if self.allow_add_remove:
             lb = 0
 
         if self.allow_viewpoint_update:
-            ub = 6
+            ub = 7
 
         i = np.random.randint(lb, ub)
 
@@ -93,6 +95,9 @@ class ShapeMaxNProposal(ShapeProposal):
             info = "change size"
             hp, q_hp_h, q_h_hp = self.change_part_size(h)
         elif i == 5:
+            info = "move object"
+            hp, q_hp_h, q_h_hp = self.move_object(h)
+        elif i == 6:
             info = "change viewpoint"
             hp, q_hp_h, q_h_hp = self.change_viewpoint(h)
 
@@ -111,12 +116,12 @@ class ShapeMaxNProposal(ShapeProposal):
             hp.parts.append(new_part)
             if part_count == 1:
                 # q(hp|h)
-                q_hp_h = 1.0 * (1.0 / 8.0)
+                q_hp_h = 1.0
                 # q(h|hp)
                 q_h_hp = 0.5 * (1.0 / (part_count + 1))
             else:
                 # prob. of picking the add move * prob. of picking x,y,z * prob. picking w,h,d
-                q_hp_h = 0.5 * (1.0 / 8.0)
+                q_hp_h = 0.5
                 q_h_hp = 0.5 * (1.0 / (part_count + 1))
                 # if remove is the only possible reverse move
                 if part_count == (h.maxn - 1):
@@ -127,10 +132,10 @@ class ShapeMaxNProposal(ShapeProposal):
             hp.parts.pop(remove_id)
             if part_count == 2:
                 q_hp_h = 0.5 * (1.0 / part_count)
-                q_h_hp = 1.0 * (1.0 / 8.0)
+                q_h_hp = 1.0
             else:
                 q_hp_h = 0.5 * (1.0 / part_count)
-                q_h_hp = 0.5 * (1.0 / 8.0)
+                q_h_hp = 0.5
                 # if remove move is the only possible move
                 if part_count == h.maxn:
                     q_hp_h = 1.0 * (1.0 / part_count)
@@ -145,7 +150,7 @@ if __name__ == "__main__":
 
     max_part_count = 8
     # generate initial hypothesis shape randomly
-    h = ShapeMaxN(forward_model=fwm, viewpoint=[(3.0, -3.0, 3.0)], maxn=max_part_count)
+    h = ShapeMaxN(forward_model=fwm, viewpoint=[(1.5, -1.5, 1.5)], maxn=max_part_count)
 
     # read data (i.e., observed image) from disk
     # obj_name = 'o1_t2_rp_d2'

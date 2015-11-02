@@ -1,12 +1,15 @@
 """
 Convolutional NN for predicting shape
+The output is the voxel based representation, not
+the positions/sizes of objects.
 
 Goker Erdogan
-19 Oct. 2015
+26 Oct. 2015
 https://gitub.com/gokererdogan
 """
 
 import numpy as np
+
 import gmllib.dataset as dataset
 
 from keras.models import Sequential
@@ -17,9 +20,9 @@ from keras.callbacks import EarlyStopping
 
 np.random.seed(1234)
 
-part_count = 2
+VOXEL_PER_AXIS = 3
 # load dataset
-ds = dataset.DataSet.load_from_path('2 part, fixed size', folder='data/2_part_fixed_size')
+ds = dataset.DataSet.load_from_path('voxel output', folder='data/random_part_random_size_voxel_output')
 # reshape data for 2D Convolution layer
 train_x = np.reshape(ds.train.x, (16000, 1, 50, 50))
 test_x = np.reshape(ds.test.x, (4000, 1, 50, 50))
@@ -33,7 +36,8 @@ model.add(Flatten())
 model.add(Dense(output_dim=512))
 model.add(Activation('relu'))
 model.add(Dropout(0.5))
-model.add(Dense(output_dim=(part_count * 3)))
+model.add(Dense(output_dim=(VOXEL_PER_AXIS ** 3)))
+# model.add(Activation('sigmoid'))
 
 # sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
 # ada = Adagrad()

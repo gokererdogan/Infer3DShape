@@ -5,3 +5,4 @@ MCMCHypothesis itself, with its own implementations of likelihood, prior etc, bu
 couldn't overwrite them (since in order to overwrite them I had to change some important bits in AoMRShapeGrammar and 
 BDAoOSS). Therefore, I elected to create a new BDAoOSSShape hypothesis using PCFGTree from BDAoOSS and 
 BDAoOSSSpatialModel.~~
+- Use log probabilities instead of probabilities to prevent any under/overflow errors.

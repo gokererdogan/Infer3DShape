@@ -20,17 +20,20 @@ import gmllib.helpers as hlp
 
 def generate_object_fixed_part_count_and_size(part_count=5):
     s = hyp.Shape(forward_model=None, part_count=part_count)
-    for part in s.parts:
+    # sort parts according to x position
+    x = np.zeros(part_count)
+    for i, part in enumerate(s.parts):
+        x[i] = part.position[0]
         part.size = np.ones(3) * 0.6
-    y = s.to_narray().flatten()
+    sort_ix = np.argsort(x)
     # get rid of size information (it is constant)
-    sy = np.zeros(part_count * 3)
-    for i in range(part_count):
-        sy[(i * 3):((i + 1) * 3)] = y[(i * 6):((i * 6) + 3)]
-    return s, sy
+    y = np.zeros(part_count * 3)
+    for i, ix in enumerate(sort_ix):
+        y[(i * 3):((i + 1) * 3)] = s.parts[ix].position
+    return s, y
 
 if __name__ == "__main__":
-    part_count = 5
+    part_count = 2
     object_count = 20000
     max_pixel_value = 175.0
 
@@ -43,7 +46,7 @@ if __name__ == "__main__":
     fwm = vfm.VisionForwardModel(render_size=img_size, camera_pos=[(3.0, -3.0, 3.0)])
 
     x = np.zeros((object_count, img_size[0] * img_size[1]))
-    y = np.zeros((object_count, 5 * 3))
+    y = np.zeros((object_count, part_count * 3))
     for i in range(object_count):
         hlp.progress_bar(current=i+1, max=object_count, label='Generating object...')
         h, h_y = generate_object_fixed_part_count_and_size(part_count=part_count)
@@ -59,9 +62,9 @@ if __name__ == "__main__":
     ty = y[0:16000]
     sx = x[16000:]
     sy = y[16000:]
-    np.save("{0:s}/5_part_fixed_size/train_x.npy".format(data_folder), tx)
-    np.save("{0:s}/5_part_fixed_size/train_y.npy".format(data_folder), ty)
-    np.save("{0:s}/5_part_fixed_size/test_x.npy".format(data_folder), sx)
-    np.save("{0:s}/5_part_fixed_size/test_y.npy".format(data_folder), sy)
+    np.save("{0:s}/2_part_fixed_size/train_x.npy".format(data_folder), tx)
+    np.save("{0:s}/2_part_fixed_size/train_y.npy".format(data_folder), ty)
+    np.save("{0:s}/2_part_fixed_size/test_x.npy".format(data_folder), sx)
+    np.save("{0:s}/2_part_fixed_size/test_y.npy".format(data_folder), sy)
 
 

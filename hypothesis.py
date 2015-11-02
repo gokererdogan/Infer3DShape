@@ -21,9 +21,11 @@ LL_VARIANCE = 0.001 # in squared pixel distance
 MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
 LL_FILTER_SIGMA = 2.0
 MOVE_PART_VARIANCE = .005
+# variance of move object proposals. this proposal moves the whole object (all the parts).
+MOVE_OBJECT_VARIANCE = 0.1
 CHANGE_SIZE_VARIANCE = .005
 # the default viewpoint(s) for an object
-DEFAULT_VIEWPOINT = [(3.0, -3.0, 3.0)]
+DEFAULT_VIEWPOINT = [(1.5, -1.5, 1.5)]
 # in degrees
 CHANGE_VIEWPOINT_VARIANCE = 60.0
 
@@ -86,7 +88,7 @@ class CuboidPrimitive:
     CuboidPrimitive class defines a 3D rectangular prism used as a primitive
     in our Object class. A CuboidPrimitive is specified by its position and
     size.
-    position (x,y,z) ~ Unif(-1,1)
+    position (x,y,z) ~ Unif(-0.5,0.5)
     size (w,h,d) ~ Unif(0,1)
     """
     def __init__(self, position=None, size=None):
@@ -95,7 +97,7 @@ class CuboidPrimitive:
 
         if position is None:
             # randomly pick position
-            self.position = 2.0 * (np.random.rand(3) - 0.5)
+            self.position = (np.random.rand(3) - 0.5)
         if size is None:
             # randomly pick size
             self.size = np.random.rand(3)
@@ -153,9 +155,9 @@ class Shape(Hypothesis):
     def prior(self):
         if self.p is None:
             # assumes a uniform prob. dist. over add object probability,
-            # position (in [-1,1]) and size (in [0,1])
+            # position (in [-0.5,0.5]) and size (in [0,1])
             part_count = len(self.parts)
-            self.p = (1.0 / (part_count + 1)) * (1.0 / (part_count + 2.0)) * ((1.0 / 8.0)**part_count)
+            self.p = (1.0 / (part_count + 1)) * (1.0 / (part_count + 2.0))
         return self.p
 
     def likelihood(self, data):
@@ -196,7 +198,9 @@ class Shape(Hypothesis):
         """
         Returns a (deep) copy of the instance
         """
-        self_copy = Shape(self.forward_model)
+        # NOTE that we are not copying params. This assumes that
+        # parameters do not change from hypothesis to hypothesis.
+        self_copy = Shape(self.forward_model, params=self.params)
         parts_copy = deepcopy(self.parts)
         viewpoint_copy = deepcopy(self.viewpoint)
         self_copy.parts = parts_copy
@@ -251,10 +255,10 @@ class Shape(Hypothesis):
             else:
                 # 2.0 is for position difference. It is the on
                 # average distance between two parts.
-                dist = dist + 2.0 + np.sum(np.abs(part.size))
+                dist = dist + 1.0 + np.sum(np.abs(part.size))
 
         for ri in remaining_parts:
-            dist = dist + 2.0 + np.sum(np.abs(other.parts[ri].size))
+            dist = dist + 1.0 + np.sum(np.abs(other.parts[ri].size))
 
         return dist
 
@@ -291,10 +295,7 @@ class Shape(Hypothesis):
 
     def __getstate__(self):
         # we cannot pickle VTKObjects, so get rid of them.
-        return  {k:v for k, v in self.__dict__.iteritems() if k != 'forward_model'}
-
-
-
+        return {k: v for k, v in self.__dict__.iteritems() if k != 'forward_model'}
 
 class ShapeProposal(Proposal):
     """
@@ -309,14 +310,15 @@ class ShapeProposal(Proposal):
         self.params = params
         if self.params is None:
             self.params = {'CHANGE_SIZE_VARIANCE': CHANGE_SIZE_VARIANCE, 'MOVE_PART_VARIANCE': MOVE_PART_VARIANCE,
+                           'MOVE_OBJECT_VARIANCE': MOVE_OBJECT_VARIANCE,
                            'CHANGE_VIEWPOINT_VARIANCE': CHANGE_VIEWPOINT_VARIANCE}
 
     def propose(self, h, *args):
         # pick one move randomly
         if self.allow_viewpoint_update:
-            i = np.random.randint(0, 6)
+            i = np.random.randint(0, 7)
         else:
-            i = np.random.randint(0, 5)
+            i = np.random.randint(0, 6)
 
         if i == 0:
             info = "add/remove part"
@@ -334,6 +336,9 @@ class ShapeProposal(Proposal):
             info = "change size"
             hp, q_hp_h, q_h_hp = self.change_part_size(h)
         elif i == 5:
+            info = "move object"
+            hp, q_hp_h, q_h_hp = self.move_object(h)
+        elif i == 6:
             info = "change viewpoint"
             hp, q_hp_h, q_h_hp = self.change_viewpoint(h)
 
@@ -350,12 +355,12 @@ class ShapeProposal(Proposal):
             hp.parts.append(new_part)
             if part_count == 1:
                 # q(hp|h)
-                q_hp_h = 1.0 * (1.0 / 8.0)
+                q_hp_h = 1.0
                 # q(h|hp)
                 q_h_hp = 0.5 * (1.0 / (part_count + 1))
             else:
                 # prob. of picking the add move * prob. of picking x,y,z * prob. picking w,h,d
-                q_hp_h = 0.5 * (1.0 / 8.0)
+                q_hp_h = 0.5
                 q_h_hp = 0.5 * (1.0 / (part_count + 1))
         else:
             # remove move
@@ -363,10 +368,10 @@ class ShapeProposal(Proposal):
             hp.parts.pop(remove_id)
             if part_count == 2:
                 q_hp_h = 0.5 * (1.0 / part_count)
-                q_h_hp = 1.0 * (1.0 / 8.0)
+                q_h_hp = 1.0
             else:
                 q_hp_h = 0.5 * (1.0 / part_count)
-                q_h_hp = 0.5 * (1.0 / 8.0)
+                q_h_hp = 0.5
 
         return hp, q_hp_h, q_h_hp
 
@@ -374,9 +379,8 @@ class ShapeProposal(Proposal):
         hp = h.copy()
         part_count = len(h.parts)
         part_id = np.random.randint(0, part_count)
-        hp.parts[part_id].position = 2.0 * (np.random.rand(3) - 0.5)
-        # q(hp|h) = (1 / number of parts) * (1 / 8) (picking the new x,y,z)
-        # q(h|hp) = q(hp|h), that is why we simple set both q(.|.) to 1.
+        hp.parts[part_id].position = (np.random.rand(3) - 0.5)
+        # q(h|hp) = q(hp|h), that is why we simply set both q(.|.) to 1.
         return hp, 1.0, 1.0
 
     def move_part_local(self, h):
@@ -384,9 +388,22 @@ class ShapeProposal(Proposal):
         part_count = len(h.parts)
         part_id = np.random.randint(0, part_count)
         change = np.random.randn(3) * np.sqrt(self.params['MOVE_PART_VARIANCE'])
-        # if proposed position is not out of bounds ([-1, 1])
-        if np.all((hp.parts[part_id].position + change) < 1.0) and np.all((hp.parts[part_id].position + change) > -1.0):
+        # if proposed position is not out of bounds ([-0.5, 0.5])
+        if np.all((hp.parts[part_id].position + change) < 0.5) and np.all((hp.parts[part_id].position + change) > -0.5):
             hp.parts[part_id].position = hp.parts[part_id].position + change
+        # proposal is symmetric; hence, q(hp|h) = q(h|hp)
+        return hp, 1.0, 1.0
+
+    def move_object(self, h):
+        hp = h.copy()
+        change = np.random.randn(3) * np.sqrt(self.params['MOVE_OBJECT_VARIANCE'])
+        # if proposed position is out of bounds ([-0.5, 0.5])
+        for part in hp.parts:
+            if np.any((part.position + change) > 0.5) or np.any((part.position + change) < -0.5):
+                return hp, 1.0, 1.0
+        # if updated position is in bounds
+        for part in hp.parts:
+            part.position = part.position + change
         # proposal is symmetric; hence, q(hp|h) = q(h|hp)
         return hp, 1.0, 1.0
 
@@ -434,28 +451,28 @@ if __name__ == "__main__":
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
     # generate a test object
     # test 1
-    parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([1.0, .75, .75])),
-             CuboidPrimitive(np.array([.75, 0.0, 0.0]), np.array([.5, .5, .5]))]
+    parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.5, .75/2, .75/2])),
+             CuboidPrimitive(np.array([.75/2, 0.0, 0.0]), np.array([.25, .25, .25]))]
 
     # test 2
-    parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([1.0, .75, .75])),
-             CuboidPrimitive(np.array([.9, 0.0, 0.0]), np.array([.8, .5, .5])),
-             CuboidPrimitive(np.array([0.0, 0.0, 0.75]), np.array([0.25, 0.35, .75])),
-             CuboidPrimitive(np.array([0.0, 0.4, 0.75]), np.array([.2, .45, .25]))]
+    parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.5, .75/2, .75/2])),
+             CuboidPrimitive(np.array([.45, 0.0, 0.0]), np.array([.4, .25, .25])),
+             CuboidPrimitive(np.array([0.0, 0.0, 0.75/2]), np.array([0.25/2, 0.35/2, .75/2])),
+             CuboidPrimitive(np.array([0.0, 0.2, 0.75/2]), np.array([.1, .45/2, .25/2]))]
 
     # test 3
-    parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.4, 0.4, 0.9])),
-             CuboidPrimitive(np.array([.35, 0.0, 0.20]), np.array([0.3, 0.3, 0.3])),
-             CuboidPrimitive(np.array([0.6, 0.0, -0.45]), np.array([0.8, 0.4, 0.4])),
-             CuboidPrimitive(np.array([0.85, 0.0, 0.05]), np.array([0.3, 0.3, 0.6])),
-             CuboidPrimitive(np.array([-0.5, 0.0, 0.3]), np.array([0.6, 0.6, 0.6])),
-             CuboidPrimitive(np.array([-0.5, -0.5, 0.4]), np.array([0.2, 0.4, 0.2]))]
+    parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.2, 0.2, 0.45])),
+             CuboidPrimitive(np.array([.35/2, 0.0, 0.10]), np.array([0.15, 0.15, 0.15])),
+             CuboidPrimitive(np.array([0.3, 0.0, -0.45/2]), np.array([0.4, 0.2, 0.2])),
+             CuboidPrimitive(np.array([0.85/2, 0.0, 0.05/2]), np.array([0.15, 0.15, 0.3])),
+             CuboidPrimitive(np.array([-0.25, 0.0, 0.15]), np.array([0.3, 0.3, 0.3])),
+             CuboidPrimitive(np.array([-0.25, -0.25, 0.2]), np.array([0.1, 0.2, 0.1]))]
 
     angle = np.random.randint(0, 360)
     print(angle)
-    x = 3.0 * np.sqrt(2.0) * np.cos(angle / 180.0 * np.pi)
-    y = 3.0 * np.sqrt(2.0) * np.sin(angle / 180.0 * np.pi)
-    viewpoint = [(x, y, 3.0)]
+    x = 1.5 * np.sqrt(2.0) * np.cos(angle / 180.0 * np.pi)
+    y = 1.5 * np.sqrt(2.0) * np.sin(angle / 180.0 * np.pi)
+    viewpoint = [(x, y, 1.5)]
 
     h = Shape(fwm, parts=parts, viewpoint=viewpoint)
     # fwm._view(h)
