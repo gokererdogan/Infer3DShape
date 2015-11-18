@@ -1,7 +1,8 @@
 """
 Inferring 3D Shape from 2D Images
 
-This script is for calculating similarities between stimuli in BDAoOSS experiment.
+This script is for calculating similarities based on our model (Infer3DShape)
+between stimuli in BDAoOSS experiment.
 
 Created on Oct 5, 2015
 

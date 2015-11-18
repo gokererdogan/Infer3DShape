@@ -14,7 +14,6 @@ https://github.com/gokererdogan/
 
 import numpy as np
 import time
-import matplotlib.pyplot as plt
 import pandas as pd
 import pandasql as psql
 import cPickle

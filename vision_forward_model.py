@@ -17,7 +17,7 @@ import scipy.misc
 from gmllib.helpers import rgb2gray
 
 # canonical view +- 45 degrees
-DEFAULT_CAMERA_POS = [(3.0, -3.0, 3.0), (4.242, 0.0, 3.0), (0.0, -4.242, 3.0), (3.0, 3.0, 3.0), (-3.0, -3.0, 3.0)]
+DEFAULT_CAMERA_POS = [(1.5, -1.5, 1.5), (2.121, 0.0, 1.5), (0.0, -2.121, 1.5), (1.5, 1.5, 1.5), (-1.5, -1.5, 1.5)]
 DEFAULT_RENDER_SIZE = (100, 100)
 DEFAULT_CAMERA_UP = (0, 0, 1)
 

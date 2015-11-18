@@ -113,7 +113,7 @@ def run_chain(input_file, results_folder, data_folder, hypothesis_class, single_
 
 if __name__ == "__main__":
     ADD_PART_PROB = 0.6
-    LL_VARIANCE = 0.0001 # in squared pixel distance
+    LL_VARIANCE = 0.001 # in squared pixel distance
     MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
     LL_FILTER_SIGMA = 2.0
     MOVE_PART_VARIANCE = .005
@@ -121,10 +121,26 @@ if __name__ == "__main__":
     CHANGE_SIZE_VARIANCE = .040
     CHANGE_VIEWPOINT_VARIANCE = 60.0
 
-    experiment = exp.Experiment(name="TestObjects", experiment_method=run_chain, single_view=False,
-                                hypothesis_class=['bdaoossShape'],
-                                input_file=['test1', 'test2', 'test3'], results_folder='./results',
-                                data_folder='./data', render_size=(100, 100),
+    experiment = exp.Experiment(name="o2345_single_view", experiment_method=run_chain, single_view=True,
+                                hypothesis_class=['bdaoossShapeMaxD'],
+                                input_file=['o2', 'o2_t1_cs_d1', 'o2_t1_cs_d2',
+                                            'o2_t2_ap_d1', 'o2_t2_ap_d2',
+                                            'o2_t2_rp_d1', 'o2_t2_rp_d2',
+                                            'o2_t2_mf_d1', 'o2_t2_mf_d2',
+                                            'o3', 'o3_t1_cs_d1', 'o3_t1_cs_d2',
+                                            'o3_t2_ap_d1', 'o3_t2_ap_d2',
+                                            'o3_t2_rp_d1', 'o3_t2_rp_d2',
+                                            'o3_t2_mf_d1', 'o3_t2_mf_d2',
+                                            'o4', 'o4_t1_cs_d1', 'o4_t1_cs_d2',
+                                            'o4_t2_ap_d1', 'o4_t2_ap_d2',
+                                            'o4_t2_rp_d1', 'o4_t2_rp_d2',
+                                            'o4_t2_mf_d1', 'o4_t2_mf_d2',
+                                            'o5', 'o5_t1_cs_d1', 'o5_t1_cs_d2',
+                                            'o5_t2_ap_d1', 'o5_t2_ap_d2',
+                                            'o5_t2_rp_d1', 'o5_t2_rp_d2',
+                                            'o5_t2_mf_d1', 'o5_t2_mf_d2'],
+                                results_folder='./results',
+                                data_folder='./data/stimuli20150624_144833', render_size=(200, 200),
                                 max_part_count=8, max_depth=3,
                                 add_part_prob=ADD_PART_PROB, ll_variance=LL_VARIANCE,
                                 max_pixel_value=MAX_PIXEL_VALUE,
@@ -132,12 +148,12 @@ if __name__ == "__main__":
                                 change_viewpoint_variance=CHANGE_VIEWPOINT_VARIANCE,
                                 move_part_variance=MOVE_PART_VARIANCE,
                                 move_object_variance=MOVE_OBJECT_VARIANCE,
-                                burn_in=0, sample_count=20, best_sample_count=20, thinning_period=20000,
+                                burn_in=0, sample_count=10, best_sample_count=20, thinning_period=20000,
                                 report_period=10000)
 
-    experiment.run(parallel=True, num_processes=3)
+    experiment.run(parallel=True, num_processes=16)
 
     print(experiment.results)
     experiment.save('./results')
-    experiment.append_csv('./results/TestObjects.csv')
+    experiment.append_csv('./results/Stimuli20150624.csv')
 

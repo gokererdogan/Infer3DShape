@@ -14,6 +14,17 @@ from copy import deepcopy
 import BDAoOSS.bdaooss_grammar as bdaooss
 import hypothesis as hyp
 
+# assuming that pixels ~ unif(0,1), expected variance of a pixel difference is 1/6
+LL_VARIANCE = 0.001 # in squared pixel distance
+MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
+LL_FILTER_SIGMA = 2.0
+MOVE_PART_VARIANCE = .005
+# variance of move object proposals. this proposal moves the whole object (all the parts).
+MOVE_OBJECT_VARIANCE = 0.1
+CHANGE_SIZE_VARIANCE = .005
+# in degrees
+CHANGE_VIEWPOINT_VARIANCE = 60.0
+
 class BDAoOSSShape(hyp.Hypothesis):
     """
     This class implements a shape grammar hypothesis based on the true grammar for
@@ -36,8 +47,8 @@ class BDAoOSSShape(hyp.Hypothesis):
 
         self.params = params
         if self.params is None:
-            self.params = {'ADD_OBJECT_PROB': hyp.ADD_PART_PROB, 'LL_VARIANCE': hyp.LL_VARIANCE,
-                           'MAX_PIXEL_VALUE': hyp.MAX_PIXEL_VALUE, 'LL_FILTER_SIGMA': hyp.LL_FILTER_SIGMA}
+            self.params = {'LL_VARIANCE': LL_VARIANCE, 'MAX_PIXEL_VALUE': MAX_PIXEL_VALUE,
+                           'LL_FILTER_SIGMA': LL_FILTER_SIGMA}
 
         hyp.Hypothesis.__init__(self)
 
@@ -47,13 +58,10 @@ class BDAoOSSShape(hyp.Hypothesis):
         :return:
         """
         if self.p is None:
-            part_count = len(self.shape.spatial_model.spatial_states)
             # prior = prob. of parse tree * prob. of spatial model
             # NOTE that instead of rational rules prior (which integrates out
             # production probabilities) we use the derivation prob. as prior.
-            # probability of a spatial state = prob. of size * prob. of position
-            # since size is uniform in [0, 1] and position is uniform in [-0.5, 0.5], we get 1.0 for each part.
-            self.p = self.shape.derivation_prob
+            self.p = self.shape.derivation_prob * self.shape.spatial_model.probability()
         return self.p
 
     def likelihood(self, data):
@@ -139,7 +147,10 @@ class BDAoOSSShapeMaxD(BDAoOSSShape):
         Prior for the hypothesis. We assume it is uniform.
         :return: 1.0
         """
-        return 1.0
+        # return 1.0
+        if self.p is None:
+            self.p = 1.0 / len(self.shape.spatial_model.spatial_states)
+        return self.p
 
     def copy(self):
         # NOTE that we are not copying params. This assumes that params do not change from
@@ -161,9 +172,9 @@ class BDAoOSSShapeProposal(hyp.Proposal):
 
         self.params = params
         if self.params is None:
-            self.params = {'CHANGE_SIZE_VARIANCE': hyp.CHANGE_SIZE_VARIANCE,
-                           'MOVE_OBJECT_VARIANCE': hyp.MOVE_OBJECT_VARIANCE,
-                           'CHANGE_VIEWPOINT_VARIANCE': hyp.CHANGE_VIEWPOINT_VARIANCE}
+            self.params = {'CHANGE_SIZE_VARIANCE': CHANGE_SIZE_VARIANCE,
+                           'MOVE_OBJECT_VARIANCE': MOVE_OBJECT_VARIANCE,
+                           'CHANGE_VIEWPOINT_VARIANCE': CHANGE_VIEWPOINT_VARIANCE}
 
     def propose(self, h, *args):
         # pick one move randomly
@@ -227,8 +238,7 @@ class BDAoOSSShapeProposal(hyp.Proposal):
             choices.remove(1)
 
         # this should never happen
-        if len(choices) == 0:
-            raise KeyError("No nodes to add or remove.")
+        assert len(choices) > 0, "No nodes to add or remove."
 
         move_choice = np.random.choice(choices)
         # ADD PART MOVE ----------------------------
@@ -348,7 +358,7 @@ class BDAoOSSShapeProposal(hyp.Proposal):
         hp = h.copy()
         sm = hp.shape.spatial_model
         change = np.random.randn(3) * np.sqrt(self.params['MOVE_OBJECT_VARIANCE'])
-        # if proposed position is out of bounds ([-1, 1])
+        # if proposed position is out of bounds ([-0.5, 0.5])
         for part in sm.spatial_states.values():
             if np.any((part.position + change) > 0.5) or np.any((part.position + change) < -0.5):
                 return hp, 1.0, 1.0
@@ -509,25 +519,27 @@ class BDAoOSSShapeMaxDProposal(BDAoOSSShapeProposal):
 if __name__ == "__main__":
     import vision_forward_model as vfm
     import mcmc_sampler as mcmc
-    fwm = vfm.VisionForwardModel(render_size=(200, 200))
-    kernel = BDAoOSSShapeMaxDProposal(allow_viewpoint_update=True)
+    fwm = vfm.VisionForwardModel(render_size=(100, 100))
+    kernel = BDAoOSSShapeProposal(allow_viewpoint_update=False)
 
     # generate initial hypothesis shape randomly
-    h = BDAoOSSShapeMaxD(fwm, max_depth=3, viewpoint=[(1.5, -1.5, 1.5)])
+    h = BDAoOSSShape(fwm)
 
     # read data (i.e., observed image) from disk
     obj_name = 'test1'
     # data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(obj_name))
-    data = np.load('./data/test1_single_view.npy')
+    data = np.load('./data/test1.npy')
 
     sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 20, 200, 400)
     run = sampler.sample()
-    print(run.best_samples.samples)
-    print()
-    print(run.best_samples.probs)
+    # print(run.best_samples.samples)
+    # print()
+    # print(run.best_samples.probs)
     # run.save('bdaoossMax3_{0:s}.pkl'.format(obj_name))
 
+    """
     for i, sample in enumerate(run.samples.samples):
         fwm.save_render("results/bdaoossShapeMaxD/{0:s}/s{1:d}.png".format(obj_name, i), sample)
     for i, sample in enumerate(run.best_samples.samples):
         fwm.save_render("results/bdaoossShapeMaxD/{0:s}/b{1:d}.png".format(obj_name, i), sample)
+    """

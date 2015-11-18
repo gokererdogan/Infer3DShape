@@ -12,7 +12,7 @@ Goker Erdogan
 https://github.com/gokererdogan/
 """
 
-from hypothesis import *
+from shape import *
 
 class ShapeMaxN(Shape):
     """
