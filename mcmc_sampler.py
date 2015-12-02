@@ -33,10 +33,11 @@ class MCMCRun:
         self.best_samples = BestSampleSet(best_sample_count)
         self.iteration_count = iteration_count
         self.iter_df = pd.DataFrame(index=np.arange(0, self.iteration_count), dtype=np.float,
-                                    columns=['Iteration', 'IsAccepted', 'Probability', 'LogProbability', 'MoveType'])
+                                    columns=['Iteration', 'IsAccepted', 'Probability', 'LogProbability',
+                                             'AcceptanceRatio', 'MoveType'])
 
-    def record_iteration(self, i, is_accepted, prob, move_type):
-        self.iter_df.loc[i] = [i, is_accepted, prob, np.log(prob), move_type]
+    def record_iteration(self, i, is_accepted, prob, acc, move_type):
+        self.iter_df.loc[i] = [i, is_accepted, prob, np.log(prob), acc, move_type]
 
     def add_sample(self, s, prob, iter, info):
         self.samples.add(s, prob, iter, info)
@@ -177,14 +178,13 @@ class MHSampler:
             is_accepted = 0
             # accept/reject
             if np.random.rand() < a_hp_h:
+                # print("Iteration {0:d}: p {1:f} {2:f} a {3:f}. Move: {4:s}\n".format(i, p_h, p_hp, a_hp_h, move_type))
                 is_accepted = 1
                 accepted_count += 1
                 h = hp
                 p_h = p_hp
-                # print("Iteration {0:d}: Accepted sample with probability {1:f}. \n".format(i, p_hp))
-                # print("Iteration {0:d}: p {1:f} {2:f} a {3:f}. Move: {4:s}\n".format(i, p_h, p_hp, a_hp_h, info))
 
-            run.record_iteration(i, is_accepted, p_h, move_type)
+            run.record_iteration(i, is_accepted, p_h, a_hp_h, move_type)
 
             if i > self.burn_in:
                 if (i % self.thinning_period) == 0:

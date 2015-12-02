@@ -16,11 +16,11 @@ import hypothesis as hyp
 
 # assuming that pixels ~ unif(0,1), expected variance of a pixel difference is 1/6
 LL_VARIANCE = 0.001 # in squared pixel distance
-MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
+MAX_PIXEL_VALUE = 175.0 # this is usually 255.0 but in our case because of the lighting in our renders, it is lower
 LL_FILTER_SIGMA = 2.0
 MOVE_PART_VARIANCE = .005
 # variance of move object proposals. this proposal moves the whole object (all the parts).
-MOVE_OBJECT_VARIANCE = 0.1
+MOVE_OBJECT_VARIANCE = 0.01
 CHANGE_SIZE_VARIANCE = .005
 # in degrees
 CHANGE_VIEWPOINT_VARIANCE = 60.0
@@ -129,7 +129,7 @@ class BDAoOSSShape(hyp.Hypothesis):
 class BDAoOSSShapeMaxD(BDAoOSSShape):
     """
     Shape hypothesis class based on BDAoOSS Shape grammar. This class assumes a maximum depth to parse trees and
-    assigns a uniform distribution over hypotheses.
+    uses a new prior distribution over hypotheses.
     """
     def __init__(self, forward_model, shape=None, viewpoint=None, max_depth=3, params=None):
         """
@@ -149,7 +149,7 @@ class BDAoOSSShapeMaxD(BDAoOSSShape):
         """
         # return 1.0
         if self.p is None:
-            self.p = 1.0 / len(self.shape.spatial_model.spatial_states)
+            self.p = (1.0 / 20.0)**len(self.shape.spatial_model.spatial_states)
         return self.p
 
     def copy(self):
@@ -358,9 +358,9 @@ class BDAoOSSShapeProposal(hyp.Proposal):
         hp = h.copy()
         sm = hp.shape.spatial_model
         change = np.random.randn(3) * np.sqrt(self.params['MOVE_OBJECT_VARIANCE'])
-        # if proposed position is out of bounds ([-0.5, 0.5])
+        # if proposed position is out of bounds ([-1.0, 1.0])
         for part in sm.spatial_states.values():
-            if np.any((part.position + change) > 0.5) or np.any((part.position + change) < -0.5):
+            if np.any((part.position + change) > 1.0) or np.any((part.position + change) < -1.0):
                 return hp, 1.0, 1.0
         # if updated position is in bounds
         for part in sm.spatial_states.values():
@@ -519,18 +519,19 @@ class BDAoOSSShapeMaxDProposal(BDAoOSSShapeProposal):
 if __name__ == "__main__":
     import vision_forward_model as vfm
     import mcmc_sampler as mcmc
-    fwm = vfm.VisionForwardModel(render_size=(100, 100))
-    kernel = BDAoOSSShapeProposal(allow_viewpoint_update=False)
+    fwm = vfm.VisionForwardModel(render_size=(200, 200))
+    kernel = BDAoOSSShapeMaxDProposal(allow_viewpoint_update=True)
 
     # generate initial hypothesis shape randomly
-    h = BDAoOSSShape(fwm)
+    viewpoint = [(3.0, -3.0, 3.0)]
+    params = {'LL_VARIANCE': 0.001, 'MAX_PIXEL_VALUE': MAX_PIXEL_VALUE}
+
+    h = BDAoOSSShapeMaxD(fwm, viewpoint=viewpoint, max_depth=10, params=params)
 
     # read data (i.e., observed image) from disk
-    obj_name = 'test1'
-    # data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(obj_name))
-    data = np.load('./data/test1.npy')
+    data = np.load('data/stimuli20150624_144833/o1_single_view.npy')
 
-    sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 20, 200, 400)
+    sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 10, 5000, 2000)
     run = sampler.sample()
     # print(run.best_samples.samples)
     # print()

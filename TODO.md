@@ -6,3 +6,6 @@ couldn't overwrite them (since in order to overwrite them I had to change some i
 BDAoOSS). Therefore, I elected to create a new BDAoOSSShape hypothesis using PCFGTree from BDAoOSS and 
 BDAoOSSSpatialModel.~~
 - Use log probabilities instead of probabilities to prevent any under/overflow errors.
+- Split the base MCMC stuff into a separate project
+- Add unit tests
+- Write documentation
