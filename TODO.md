@@ -9,3 +9,12 @@ BDAoOSSSpatialModel.~~
 - Split the base MCMC stuff into a separate project
 - Add unit tests
 - Write documentation
+- You shouldn't need to traverse the whole tree every time you need to add/remove parts. We can keep a list of 
+candidate nodes that is continually updated. Similarly for depth, we don't need re-calculate it every time we 
+need it.
+- bdaooss class depends on BDAoOSS package and that in turn depends on AoMRShapeGrammar. These packages should be 
+refactored; most of it is quite messy now.
+- pickle is a pain. when you change code, old pickled objects become unimportable. Implement a simpler data 
+serialization functionality. A simple idea is to simply store the positions and sizes of each part, viewpoint, and
+maybe params for each hypothesis. This should work for all the hypothesis in this package.
+- test calculate_similarity

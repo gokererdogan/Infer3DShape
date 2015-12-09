@@ -12,44 +12,42 @@ https://github.com/gokererdogan/
 """
 
 import numpy as np
-import scipy.ndimage as spi
 from copy import deepcopy
 
-from hypothesis import *
+import Infer3DShape.i3d_hypothesis as hyp
 
+# probability of adding a new part used when generating objects randomly
 ADD_PART_PROB = 0.6
-# assuming that pixels ~ unif(0,1), expected variance of a pixel difference is 1/6
-LL_VARIANCE = 0.001 # in squared pixel distance
-MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
-LL_FILTER_SIGMA = 2.0
-MOVE_PART_VARIANCE = .005
-# variance of move object proposals. this proposal moves the whole object (all the parts).
-MOVE_OBJECT_VARIANCE = 0.1
-CHANGE_SIZE_VARIANCE = .005
-# the default viewpoint(s) for an object
-DEFAULT_VIEWPOINT = [(1.5, -1.5, 1.5)]
-# in degrees
-CHANGE_VIEWPOINT_VARIANCE = 60.0
 
-
-class CuboidPrimitive:
+class CuboidPrimitive(object):
     """
     CuboidPrimitive class defines a 3D rectangular prism used as a primitive
     in our Object class. A CuboidPrimitive is specified by its position and
     size.
-    position (x,y,z) ~ Unif(-0.5,0.5)
-    size (w,h,d) ~ Unif(0,1)
+
+    Attributes:
+        position (3x1-ndarray): Position of primitive, sampled from ~ Unif(-0.5,0.5)
+        size (3x1-ndarray): Size of primitive, sampled from ~ Unif(0,1)
     """
     def __init__(self, position=None, size=None):
-        self.position = position
-        self.size = size
-
         if position is None:
             # randomly pick position
-            self.position = (np.random.rand(3) - 0.5)
+            position = (np.random.rand(3) - 0.5)
+        else:
+            position = np.array(position)
+            if np.any(np.abs(position) > 0.5):
+                raise ValueError("Position must be in [-0.5, 0.5]")
+
         if size is None:
             # randomly pick size
-            self.size = np.random.rand(3)
+            size = np.random.rand(3)
+        else:
+            size = np.array(size)
+            if np.any(size > 1.0) or np.any(size < 0.0):
+                raise ValueError("Size must be in [0.0, 1.0]")
+
+        self.position = position
+        self.size = size
 
     def __str__(self):
         s = "{0:20}{1:20}".format(np.array_str(self.position, precision=2), np.array_str(self.size, precision=2))
@@ -67,25 +65,15 @@ class CuboidPrimitive:
         return np.sum(np.abs(self.position - other.position)) + np.sum(np.abs(self.size - other.size))
 
 
-class Shape(Hypothesis):
+class Shape(hyp.I3DHypothesis):
     """
     Shape class defines a 3D object. It consists of a number of shape primitives
     that specify a shape.
     """
-    def __init__(self, forward_model, parts=None, viewpoint=None, part_count=None, params=None):
+    def __init__(self, forward_model, viewpoint=None, params=None, parts=None, part_count=None):
+        hyp.I3DHypothesis.__init__(self, forward_model, viewpoint, params)
+
         self.parts = parts
-        self.forward_model = forward_model
-
-        self.params = params
-        if self.params is None:
-            self.params = {'ADD_PART_PROB': ADD_PART_PROB, 'LL_VARIANCE': LL_VARIANCE,
-                           'MAX_PIXEL_VALUE': MAX_PIXEL_VALUE, 'LL_FILTER_SIGMA': LL_FILTER_SIGMA}
-
-        # this is the point from which we look at the object.
-        # it is a list of 3-tuples, each 3-tuple specifying one viewpoint (x,y,z).
-        # if this is not provided, camera_pos defined by forward_model is used.
-        self.viewpoint = viewpoint
-
         # generative process: add a new part until rand()>theta (add part prob.)
         # p(H|theta) = theta^|H| (1 - theta)
         if self.parts is None:
@@ -96,23 +84,35 @@ class Shape(Hypothesis):
                     self.parts.append(CuboidPrimitive())
             else:
                 self.parts = [CuboidPrimitive()]
-                while np.random.rand() < self.params['ADD_PART_PROB']:
+                while np.random.rand() < ADD_PART_PROB:
                     self.parts.append(CuboidPrimitive())
 
-        Hypothesis.__init__(self)
+    @staticmethod
+    def from_narray(arr, forward_model, viewpoint=None, params=None):
+        """
+        Create a Shape object from a numpy array.
+        arr contains the positions and sizes of each part.
+        It is a vector of length (number of parts) * 6; however
+        the array may in fact be larger and contain zeros.
+        Therefore, objects with zero size are ignored.
+        Format: part1_pos, part1_size, part2_pos, part2_size, ...
+        """
+        parts = []
+        maxN = int(arr.size / 6.0)
+        for i in range(maxN):
+            pos = arr[(6 * i):((6 * i) + 3)]
+            size = arr[((6 * i) + 3):((6 * i) + 6)]
+            if np.all(size>0) and np.sum(size) > 1e-6:
+                parts.append(CuboidPrimitive(position=pos, size=size))
 
-    def prior(self):
-        if self.p is None:
-            # assumes a uniform prob. dist. over add object probability,
-            # position (in [-0.5,0.5]) and size (in [0,1])
-            part_count = len(self.parts)
-            self.p = (1.0 / (part_count + 1)) * (1.0 / (part_count + 2.0))
-        return self.p
+        return Shape(forward_model=forward_model, parts=parts, viewpoint=viewpoint, params=params)
 
-    def likelihood(self, data):
-        if self.ll is None:
-            self.ll = self._ll_pixel(data)
-        return self.ll
+    def _calculate_log_prior(self):
+        # assumes a uniform prob. dist. over add object probability,
+        # position (in [-0.5,0.5]) and size (in [0,1])
+        # p(H) = (1.0 / (part_count + 1)) * (1.0 / (part_count + 2.0))
+        part_count = len(self.parts)
+        return -np.log(part_count + 1) - np.log(part_count + 2.0)
 
     def convert_to_positions_sizes(self):
         """
@@ -127,21 +127,6 @@ class Shape(Hypothesis):
             sizes.append(part.size)
 
         return positions, sizes
-
-    def _ll_ground_truth(self, gt):
-        return np.exp(-self.distance(gt))
-
-    def _ll_pixel_gaussian_filtered(self, data):
-        img = self.forward_model.render(self)
-        img = spi.gaussian_filter(img, self.params['LL_FILTER_SIGMA'])
-        ll = np.exp(-np.sum(np.square(img - data)) / (img.size * self.params['LL_VARIANCE']))
-        return ll
-
-    def _ll_pixel(self, data):
-        img = self.forward_model.render(self)
-        ll = np.exp(-np.sum(np.square((img - data) / self.params['MAX_PIXEL_VALUE']))
-                    / (img.size * 2 * self.params['LL_VARIANCE']))
-        return ll
 
     def copy(self):
         """
@@ -222,219 +207,134 @@ class Shape(Hypothesis):
             arr[0, ((6 * i) + 3):((6 * i) + 6)] = p.size
         return arr
 
-    @staticmethod
-    def from_narray(arr, forward_model):
-        """
-        Create a Shape object from a numpy array.
-        arr contains the positions and sizes of each part.
-        It is a vector of length (number of parts) * 6; however
-        the array may in fact be larger and contain zeros.
-        Therefore, objects with zero size are ignored.
-        Format: part1_pos, part1_size, part2_pos, part2_size, ...
-        """
-        parts = []
-        maxN = int(arr.size / 6.0)
-        for i in range(maxN):
-            pos = arr[(6 * i):((6 * i) + 3)]
-            size = arr[((6 * i) + 3):((6 * i) + 6)]
-            if np.all(size>0) and np.sum(size) > 1e-6:
-                parts.append(CuboidPrimitive(position=pos, size=size))
+# Proposal functions
+def shape_add_remove_part(h, params):
+    max_part_count = np.inf
+    if 'MAX_PART_COUNT' in params.keys():
+        max_part_count = params['MAX_PART_COUNT']
 
-        return Shape(forward_model=forward_model, parts=parts)
+    hp = h.copy()
+    part_count = len(h.parts)
 
-    def __getstate__(self):
-        # we cannot pickle VTKObjects, so get rid of them.
-        return {k: v for k, v in self.__dict__.iteritems() if k != 'forward_model'}
+    if part_count > max_part_count:
+        raise ValueError("add/remove part expects shape hypothesis with fewer than {0:s} parts.".format(max_part_count))
 
-class ShapeProposal(Proposal):
-    """
-    ShapeProposal class implements the mixture kernel of the following moves
-        add/remove part, move part, change part size
-    """
-    def __init__(self, allow_viewpoint_update=False, params=None):
-        Proposal.__init__(self)
+    if part_count == 0:
+        raise ValueError("add/remove part expects shape hypothesis to have at least 1 part.")
 
-        self.allow_viewpoint_update = allow_viewpoint_update
-
-        self.params = params
-        if self.params is None:
-            self.params = {'CHANGE_SIZE_VARIANCE': CHANGE_SIZE_VARIANCE, 'MOVE_PART_VARIANCE': MOVE_PART_VARIANCE,
-                           'MOVE_OBJECT_VARIANCE': MOVE_OBJECT_VARIANCE,
-                           'CHANGE_VIEWPOINT_VARIANCE': CHANGE_VIEWPOINT_VARIANCE}
-
-    def propose(self, h, *args):
-        # pick one move randomly
-        if self.allow_viewpoint_update:
-            i = np.random.randint(0, 7)
-        else:
-            i = np.random.randint(0, 6)
-
-        if i == 0:
-            info = "add/remove part"
-            hp, q_hp_h, q_h_hp = self.add_remove_part(h)
-        elif i == 1:
-            info = "move part local"
-            hp, q_hp_h, q_h_hp = self.move_part_local(h)
-        elif i == 2:
-            info = "move part"
-            hp, q_hp_h, q_h_hp = self.move_part(h)
-        elif i == 3:
-            info = "change size local"
-            hp, q_hp_h, q_h_hp = self.change_part_size_local(h)
-        elif i == 4:
-            info = "change size"
-            hp, q_hp_h, q_h_hp = self.change_part_size(h)
-        elif i == 5:
-            info = "move object"
-            hp, q_hp_h, q_h_hp = self.move_object(h)
-        elif i == 6:
-            info = "change viewpoint"
-            hp, q_hp_h, q_h_hp = self.change_viewpoint(h)
-
-        return info, hp, q_hp_h, q_h_hp
-
-    def add_remove_part(self, h):
-        hp = h.copy()
-        part_count = len(h.parts)
-        # we need to be careful about hypotheses with 1 or 2 parts
-        # because we cannot apply remove move to a hypothesis with 1 parts
-        if part_count == 1 or np.random.rand() < .5:
-            # add move
-            new_part = CuboidPrimitive()
-            hp.parts.append(new_part)
-            if part_count == 1:
-                # q(hp|h)
-                q_hp_h = 1.0
-                # q(h|hp)
-                q_h_hp = 0.5 * (1.0 / (part_count + 1))
-            else:
-                # prob. of picking the add move * prob. of picking x,y,z * prob. picking w,h,d
-                q_hp_h = 0.5
-                q_h_hp = 0.5 * (1.0 / (part_count + 1))
-        else:
-            # remove move
-            remove_id = np.random.randint(0, part_count)
-            hp.parts.pop(remove_id)
-            if part_count == 2:
-                q_hp_h = 0.5 * (1.0 / part_count)
-                q_h_hp = 1.0
-            else:
-                q_hp_h = 0.5 * (1.0 / part_count)
-                q_h_hp = 0.5
-
-        return hp, q_hp_h, q_h_hp
-
-    def move_part(self, h):
-        hp = h.copy()
-        part_count = len(h.parts)
-        part_id = np.random.randint(0, part_count)
-        hp.parts[part_id].position = (np.random.rand(3) - 0.5)
-        # q(h|hp) = q(hp|h), that is why we simply set both q(.|.) to 1.
+    # we cannot add or remove parts if max_part_count is 1.
+    if max_part_count == 1:
         return hp, 1.0, 1.0
 
-    def move_part_local(self, h):
-        hp = h.copy()
-        part_count = len(h.parts)
-        part_id = np.random.randint(0, part_count)
-        change = np.random.randn(3) * np.sqrt(self.params['MOVE_PART_VARIANCE'])
-        # if proposed position is not out of bounds ([-0.5, 0.5])
-        if np.all((hp.parts[part_id].position + change) < 0.5) and np.all((hp.parts[part_id].position + change) > -0.5):
-            hp.parts[part_id].position = hp.parts[part_id].position + change
-        # proposal is symmetric; hence, q(hp|h) = q(h|hp)
-        return hp, 1.0, 1.0
+    # we need to be careful about hypotheses with 1 or 2 parts
+    # because we cannot apply remove move to a hypothesis with 1 parts
+    # similarly we need to be careful with hypotheses with maxn or
+    # maxn-1 parts
+    if part_count == 1 or (part_count != max_part_count and np.random.rand() < .5):
+        # add move
+        new_part = CuboidPrimitive()
+        hp.parts.append(new_part)
 
-    def move_object(self, h):
-        hp = h.copy()
-        change = np.random.randn(3) * np.sqrt(self.params['MOVE_OBJECT_VARIANCE'])
-        # if proposed position is out of bounds ([-0.5, 0.5])
-        for part in hp.parts:
-            if np.any((part.position + change) > 0.5) or np.any((part.position + change) < -0.5):
-                return hp, 1.0, 1.0
-        # if updated position is in bounds
-        for part in hp.parts:
-            part.position = part.position + change
-        # proposal is symmetric; hence, q(hp|h) = q(h|hp)
-        return hp, 1.0, 1.0
+        # q(hp|h)
+        q_hp_h = 0.5
+        # if add is the only move possible
+        if part_count == 1:
+            q_hp_h = 1.0
 
-    def change_part_size(self, h):
-        hp = h.copy()
-        part_count = len(h.parts)
-        part_id = np.random.randint(0, part_count)
-        hp.parts[part_id].size = np.random.rand(3)
-        return hp, 1.0, 1.0
+        # q(h|hp)
+        q_h_hp = 0.5 * (1.0 / (part_count + 1))
+        #  if remove is the only possible reverse move
+        if part_count == (max_part_count - 1):
+            q_h_hp = 1.0 * (1.0 / (part_count + 1))
+    else:
+        # remove move
+        remove_id = np.random.randint(0, part_count)
+        hp.parts.pop(remove_id)
 
-    def change_part_size_local(self, h):
-        hp = h.copy()
-        part_count = len(h.parts)
-        part_id = np.random.randint(0, part_count)
-        change = np.random.randn(3) * np.sqrt(self.params['CHANGE_SIZE_VARIANCE'])
-        # if proposed size is not out of bounds ([0, 1])
-        if np.all((hp.parts[part_id].size + change) < 1.0) and np.all((hp.parts[part_id].size + change) > 0.0):
-            hp.parts[part_id].size = hp.parts[part_id].size + change
-        return hp, 1.0, 1.0
+        q_h_hp = 0.5
+        if part_count == 2:
+            q_h_hp = 1.0
 
-    def change_viewpoint(self, h):
-        hp = h.copy()
-        # we rotate viewpoint around z axis, keeping the distance to the origin fixed.
-        # default viewpoint is (1.5, -1.5, 1.5)
-        # add random angle
-        change = np.random.randn() * np.sqrt(self.params['CHANGE_VIEWPOINT_VARIANCE'])
-        for i, viewpoint in enumerate(hp.viewpoint):
-            x = viewpoint[0]
-            y = viewpoint[1]
-            z = viewpoint[2]
-            d = np.sqrt(x**2 + y**2)
-            # calculate angle
-            angle = ((180.0 * np.arctan2(y, x) / np.pi) + 360.0) % 360.0
-            angle = (angle + change) % 360.0
-            nx = d * np.cos(angle * np.pi / 180.0)
-            ny = d * np.sin(angle * np.pi / 180.0)
-            hp.viewpoint[i] = (nx, ny, z)
+        q_hp_h = 0.5 * (1.0 / part_count)
+        # if remove move is the only possible move
+        if part_count == max_part_count:
+            q_hp_h = 1.0 * (1.0 / part_count)
 
-        return hp, 1.0, 1.0
+    return hp, q_hp_h, q_h_hp
 
+def shape_move_part(h, params):
+    hp = h.copy()
+    part_count = len(h.parts)
+    part_id = np.random.randint(0, part_count)
+    hp.parts[part_id].position = (np.random.rand(3) - 0.5)
+    # q(h|hp) = q(hp|h), that is why we simply set both q(.|.) to 1.
+    return hp, 1.0, 1.0
 
+def shape_move_part_local(h, params):
+    hp = h.copy()
+    part_count = len(h.parts)
+    part_id = np.random.randint(0, part_count)
+    change = np.random.randn(3) * np.sqrt(params['MOVE_PART_VARIANCE'])
+    # if proposed position is not out of bounds ([-0.5, 0.5])
+    if np.all((hp.parts[part_id].position + change) < 0.5) and np.all((hp.parts[part_id].position + change) > -0.5):
+        hp.parts[part_id].position = hp.parts[part_id].position + change
+    # proposal is symmetric; hence, q(hp|h) = q(h|hp)
+    return hp, 1.0, 1.0
 
+def shape_move_object(h, params):
+    hp = h.copy()
+    change = np.random.randn(3) * np.sqrt(params['MOVE_OBJECT_VARIANCE'])
+    # if proposed position is out of bounds ([-0.5, 0.5])
+    for part in hp.parts:
+        if np.any((part.position + change) > 0.5) or np.any((part.position + change) < -0.5):
+            return hp, 1.0, 1.0
+    # if updated position is in bounds
+    for part in hp.parts:
+        part.position = part.position + change
+    # proposal is symmetric; hence, q(hp|h) = q(h|hp)
+    return hp, 1.0, 1.0
+
+def shape_change_part_size(h, params):
+    hp = h.copy()
+    part_count = len(h.parts)
+    part_id = np.random.randint(0, part_count)
+    hp.parts[part_id].size = np.random.rand(3)
+    return hp, 1.0, 1.0
+
+def shape_change_part_size_local(h, params):
+    hp = h.copy()
+    part_count = len(h.parts)
+    part_id = np.random.randint(0, part_count)
+    change = np.random.randn(3) * np.sqrt(params['CHANGE_SIZE_VARIANCE'])
+    # if proposed size is not out of bounds ([0, 1])
+    if np.all((hp.parts[part_id].size + change) < 1.0) and np.all((hp.parts[part_id].size + change) > 0.0):
+        hp.parts[part_id].size = hp.parts[part_id].size + change
+    return hp, 1.0, 1.0
 
 if __name__ == "__main__":
     import vision_forward_model as vfm
+    import mcmclib.proposal
+    import mcmclib.mh_sampler
+    import i3d_proposal
+
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
-    # generate a test object
-    # test 1
-    parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.5, .75/2, .75/2])),
-             CuboidPrimitive(np.array([.75/2, 0.0, 0.0]), np.array([.25, .25, .25]))]
+    h = Shape(forward_model=fwm, viewpoint=[(1.5, -1.5, 1.5)], params={'LL_VARIANCE': 0.001})
 
-    # test 2
-    parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.5, .75/2, .75/2])),
-             CuboidPrimitive(np.array([.45, 0.0, 0.0]), np.array([.4, .25, .25])),
-             CuboidPrimitive(np.array([0.0, 0.0, 0.75/2]), np.array([0.25/2, 0.35/2, .75/2])),
-             CuboidPrimitive(np.array([0.0, 0.2, 0.75/2]), np.array([.1, .45/2, .25/2]))]
+    moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part': shape_move_part,
+             'shape_move_part_local': shape_move_part_local, 'shape_change_part_size': shape_change_part_size,
+             'shape_change_part_size_local': shape_change_part_size_local, 'shape_move_object': shape_move_object,
+             'change_viewpoint': i3d_proposal.change_viewpoint}
 
-    # test 3
-    parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.2, 0.2, 0.45])),
-             CuboidPrimitive(np.array([.35/2, 0.0, 0.10]), np.array([0.15, 0.15, 0.15])),
-             CuboidPrimitive(np.array([0.3, 0.0, -0.45/2]), np.array([0.4, 0.2, 0.2])),
-             CuboidPrimitive(np.array([0.85/2, 0.0, 0.05/2]), np.array([0.15, 0.15, 0.3])),
-             CuboidPrimitive(np.array([-0.25, 0.0, 0.15]), np.array([0.3, 0.3, 0.3])),
-             CuboidPrimitive(np.array([-0.25, -0.25, 0.2]), np.array([0.1, 0.2, 0.1]))]
+    params = {'MOVE_PART_VARIANCE': 0.01,
+              'MOVE_OBJECT_VARIANCE': 0.01,
+              'CHANGE_SIZE_VARIANCE': 0.01,
+              'CHANGE_VIEWPOINT_VARIANCE': 300.0}
 
-    angle = np.random.randint(0, 360)
-    print(angle)
-    x = 1.5 * np.sqrt(2.0) * np.cos(angle / 180.0 * np.pi)
-    y = 1.5 * np.sqrt(2.0) * np.sin(angle / 180.0 * np.pi)
-    viewpoint = [(x, y, 1.5)]
+    proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
 
-    h = Shape(fwm, parts=parts, viewpoint=viewpoint)
-    # fwm._view(h)
-    img = fwm.render(h)
-    np.save('./data/test3_single_view.npy', img)
-    fwm.save_render('./data/test3_single_view.png', h)
+    data = np.load('data/test1_single_view.npy')
 
-    # generate shape randomly
-    hr = Shape(fwm, viewpoint=viewpoint)
-    # read data (i.e., observed image) from disk
-    data = np.load('./data/test3_single_view.npy')
-    # fwm._view(hr)
+    sampler = mcmclib.mh_sampler.MHSampler(h, data, proposal, burn_in=1000, sample_count=10, best_sample_count=10,
+                                           thinning_period=2000, report_period=2000)
 
-    print hr.likelihood(data)
-    print h.likelihood(data)
+    run = sampler.sample()

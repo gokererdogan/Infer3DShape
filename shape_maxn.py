@@ -17,34 +17,42 @@ from shape import *
 class ShapeMaxN(Shape):
     """
     ShapeMaxN class defines a 3D object with maximum N parts.
-    """
-    def __init__(self, forward_model, viewpoint=None, maxn=6, parts=None, params=None):
-        self.maxn = maxn
 
-        add_part_prob = ADD_PART_PROB
-        if params is not None and 'ADD_PART_PROB' in params.keys():
-            add_part_prob = params['ADD_PART_PROB']
+    This class is based on Shape class and defines only one additional attribute.
+
+    Attributes:
+        maxn (int): number of maximum parts allowed.
+            Note this attribute is only used to make sure the randomly generated hypothesis does not have more than
+            maxn parts. The mechanics of ensuring that a hypothesis never has more than maxn parts are handled by the
+            proposal functions.
+    """
+    def __init__(self, forward_model, viewpoint=None, parts=None, params=None, maxn=10):
+        Shape.__init__(self, forward_model=forward_model, viewpoint=viewpoint, params=params, parts=parts)
+        self.maxn = maxn
 
         # generative process: add a new part until rand()>theta (add part prob.)
         # p(H|theta) = theta^|H| (1 - theta)
         if parts is None:
             # randomly generate a new shape
             parts = [CuboidPrimitive()]
-            while (np.random.rand() < add_part_prob) and (len(parts) < self.maxn):
+            while (np.random.rand() < ADD_PART_PROB) and (len(parts) < self.maxn):
                 parts.append(CuboidPrimitive())
 
-        Shape.__init__(self, forward_model=forward_model, parts=parts, viewpoint=viewpoint, params=params)
+    def _calculate_log_prior(self):
+        """Prior for ShapeMaxN class.
 
-    def prior(self):
-        if self.p is None:
-            # assumes a uniform prob. over all hypotheses (regardless
-            # of number of parts)
-            self.p = 1.0
-        return self.p
+        We assume a uniform prior over hypotheses.
+
+        Returns:
+            int: 0.0
+        """
+        return 0.0
 
     def copy(self):
-        """
-        Returns a (deep) copy of the instance
+        """Returns a (deep) copy of the ShapeMaxN instance
+
+        Returns:
+            ShapeMaxN: A (deep) copy of the instance
         """
         # NOTE that we are not copying params. This assumes that
         # params are not changing from hypothesis to hypothesis.
@@ -55,118 +63,37 @@ class ShapeMaxN(Shape):
         self_copy.viewpoint = viewpoint_copy
         return self_copy
 
-
-class ShapeMaxNProposal(ShapeProposal):
-    """
-    ShapeMaxNProposal class implements the mixture kernel of the following moves
-    for the ShapeMaxN class.
-        add/remove part, move part, change part size
-    """
-    def __init__(self, allow_viewpoint_update=False, allow_add_remove=True, params=None):
-        # do we allow add/remove part move?
-        self.allow_add_remove = allow_add_remove
-        ShapeProposal.__init__(self, allow_viewpoint_update=allow_viewpoint_update, params=params)
-
-    def propose(self, h, *args):
-        # pick one move randomly
-        lb = 1
-        ub = 6
-        if self.allow_add_remove:
-            lb = 0
-
-        if self.allow_viewpoint_update:
-            ub = 7
-
-        i = np.random.randint(lb, ub)
-
-        if i == 0:
-            info = "add/remove part"
-            hp, q_hp_h, q_h_hp = self.add_remove_part(h)
-        elif i == 1:
-            info = "move part local"
-            hp, q_hp_h, q_h_hp = self.move_part_local(h)
-        elif i == 2:
-            info = "move part"
-            hp, q_hp_h, q_h_hp = self.move_part(h)
-        elif i == 3:
-            info = "change size local"
-            hp, q_hp_h, q_h_hp = self.change_part_size_local(h)
-        elif i == 4:
-            info = "change size"
-            hp, q_hp_h, q_h_hp = self.change_part_size(h)
-        elif i == 5:
-            info = "move object"
-            hp, q_hp_h, q_h_hp = self.move_object(h)
-        elif i == 6:
-            info = "change viewpoint"
-            hp, q_hp_h, q_h_hp = self.change_viewpoint(h)
-
-        return info, hp, q_hp_h, q_h_hp
-
-    def add_remove_part(self, h):
-        hp = h.copy()
-        part_count = len(h.parts)
-        # we need to be careful about hypotheses with 1 or 2 parts
-        # because we cannot apply remove move to a hypothesis with 1 parts
-        # similarly we need to be careful with hypotheses with maxn or
-        # maxn-1 parts
-        if part_count == 1 or (part_count != h.maxn and np.random.rand() < .5):
-            # add move
-            new_part = CuboidPrimitive()
-            hp.parts.append(new_part)
-            if part_count == 1:
-                # q(hp|h)
-                q_hp_h = 1.0
-                # q(h|hp)
-                q_h_hp = 0.5 * (1.0 / (part_count + 1))
-            else:
-                # prob. of picking the add move * prob. of picking x,y,z * prob. picking w,h,d
-                q_hp_h = 0.5
-                q_h_hp = 0.5 * (1.0 / (part_count + 1))
-                # if remove is the only possible reverse move
-                if part_count == (h.maxn - 1):
-                    q_h_hp = 1.0 * (1.0 / (part_count + 1))
-        else:
-            # remove move
-            remove_id = np.random.randint(0, part_count)
-            hp.parts.pop(remove_id)
-            if part_count == 2:
-                q_hp_h = 0.5 * (1.0 / part_count)
-                q_h_hp = 1.0
-            else:
-                q_hp_h = 0.5 * (1.0 / part_count)
-                q_h_hp = 0.5
-                # if remove move is the only possible move
-                if part_count == h.maxn:
-                    q_hp_h = 1.0 * (1.0 / part_count)
-
-        return hp, q_hp_h, q_h_hp
-
 if __name__ == "__main__":
     import vision_forward_model as vfm
-    import mcmc_sampler as mcmc
+    import mcmclib.proposal
+    import mcmclib.mh_sampler
+    import i3d_proposal
+
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
-    kernel = ShapeMaxNProposal(allow_viewpoint_update=True)
+    max_part_count = 10
+    h = ShapeMaxN(forward_model=fwm, viewpoint=[(1.5, -1.5, 1.5)], params={'LL_VARIANCE': 0.01}, maxn=max_part_count)
 
-    max_part_count = 8
-    # generate initial hypothesis shape randomly
-    h = ShapeMaxN(forward_model=fwm, viewpoint=[(1.5, -1.5, 1.5)], maxn=max_part_count)
+    """
+    moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part': shape_move_part,
+             'shape_move_part_local': shape_move_part_local, 'shape_change_part_size': shape_change_part_size,
+             'shape_change_part_size_local': shape_change_part_size_local, 'shape_move_object': shape_move_object,
+             'change_viewpoint': i3d_proposal.change_viewpoint}
+    """    
+    
+    moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part_local': shape_move_part_local,
+             'shape_change_part_size_local': shape_change_part_size_local, 'change_viewpoint': i3d_proposal.change_viewpoint}
 
-    # read data (i.e., observed image) from disk
-    # obj_name = 'o1_t2_rp_d2'
-    obj_name = 'test1'
-    # data = np.load('./data/stimuli20150624_144833/{0:s}.npy'.format(obj_name))
-    data = np.load('./data/test1_single_view.npy')
+    params = {'MOVE_PART_VARIANCE': 0.01,
+              'MOVE_OBJECT_VARIANCE': 0.01,
+              'CHANGE_SIZE_VARIANCE': 0.01,
+              'CHANGE_VIEWPOINT_VARIANCE': 1000.0,
+              'MAX_PART_COUNT': max_part_count}
 
-    sampler = mcmc.MHSampler(h, data, kernel, 0, 10, 20, 200, 400)
+    proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
+
+    data = np.load('data/test1_single_view.npy')
+
+    sampler = mcmclib.mh_sampler.MHSampler(h, data, proposal, burn_in=1000, sample_count=10, best_sample_count=10,
+                                           thinning_period=20000, report_period=20000)
+
     run = sampler.sample()
-    print(run.best_samples.samples)
-    print()
-    print(run.best_samples.probs)
-
-    # run.save('results/shapeMaxN/test1/shapeMaxN_{0:s}.pkl'.format(obj_name))
-
-    for i, sample in enumerate(run.samples.samples):
-        fwm.save_render("results/shapeMaxN/{0:s}/s{1:d}.png".format(obj_name, i), sample)
-    for i, sample in enumerate(run.best_samples.samples):
-        fwm.save_render("results/shapeMaxN/{0:s}/b{1:d}.png".format(obj_name, i), sample)

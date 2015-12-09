@@ -16,25 +16,31 @@ import cPickle as pkl
 
 from shape_maxn import *
 import vision_forward_model as vfm
+from mcmclib.mcmc_run import MCMCRun
 
-def calculate_prob(data, samples, probs, integrate_over_viewpoint=False, use_only_MAP=False):
-    """
-    Calculate probability of observing data from samples with given probs.
+def calculate_prob(data, samples, log_probs, integrate_over_viewpoint=False, use_only_MAP=False):
+    """Calculate probability of observing data from samples with given probs.
+
         This function calculates prob(obj2|obj1) where obj2 and
         obj1 are both images for our purposes. Here obj2
         corresponds to the data parameter. samples are from
         the posterior p(h|obj1). we can estimate p(obj2|obj1) as
             p(obj2|obj1) ~ sum_h p(obj2|h)p(h|obj1)
-    :param data: Observed data.
-    :param samples: Samples.
-    :param probs: Probability of samples.
-    :param integrate_over_viewpoint: Integrate out viewpoint. If False, we calculate likelihood from the
+
+    Args:
+        data (ndarray): Observed data.
+        samples (list): Samples.
+        log_probs (list): Probability of samples.
+        integrate_over_viewpoint (bool): Integrate out viewpoint. If False, we calculate likelihood from the
             default viewpoint.
-    :param use_only_MAP: Use only the MAP sample
-    :return: Two different probability estimates:
+        use_only_MAP (bool): Use only the MAP sample
+
+    Returns:
+        (float, float): Two different probability estimates:
                 1) Probability of observing data from samples calculated integrating out viewpoint
                 2) Probability of observing data from samples calculated picking the best viewpoint
     """
+    probs = [np.exp(lp) for lp in log_probs]
     probs /= np.sum(probs)
 
     if use_only_MAP:
@@ -52,20 +58,23 @@ def calculate_prob(data, samples, probs, integrate_over_viewpoint=False, use_onl
         return sim_mean, sim_max
 
 def _prob_image_given_hypothesis(image, hypothesis, integrate_over_viewpoint=False):
-    """
-    Calculate probability of image given hypothesis, p(I|H). We can integrate over viewpoint
+    """Calculate probability of image given hypothesis, p(I|H). We can integrate over viewpoint
     if we desire. In that case, we calculate p(I|H) = sum_theta p(I, theta| H) where we assume
     a uniform distribution over theta. Instead of integrating, we can pick the viewpoint with
     the maximum likelihood. This function returns both.
-    :param image:
-    :param hypothesis:
-    :param integrate_over_viewpoint:
-    :return: sum_theta p(I, theta|H), max_theta p(I,theta|H)
+
+    Args:
+        image (ndarray):
+        hypothesis (I3DHypothesis):
+        integrate_over_viewpoint (bool):
+
+    Returns:
+        (float, float): sum_theta p(I, theta|H), max_theta p(I,theta|H)
     """
     if not integrate_over_viewpoint:
         # if we are not integrating over viewpoint, mean and max does not mean anything.
-        hypothesis.ll = None
-        ll = hypothesis.likelihood(image)
+        hypothesis._log_ll = None
+        ll = np.exp(hypothesis.log_likelihood(image))
         return ll, ll
 
     assert hypothesis.viewpoint is not None
@@ -79,8 +88,8 @@ def _prob_image_given_hypothesis(image, hypothesis, integrate_over_viewpoint=Fal
         ny = d * np.sin(theta * np.pi / 180.0)
         hypothesis.viewpoint[0] = (nx, ny, z)
         # we want the likelihood to be calculated from scratch
-        hypothesis.ll = None
-        ll = hypothesis.likelihood(image)
+        hypothesis._log_ll = None
+        ll = np.exp(hypothesis.log_likelihood(image))
         tot_ll += ll
         if ll > max_ll:
             max_ll = ll
@@ -114,14 +123,15 @@ if __name__ == "__main__":
                                                       'p_target_comp', 'p_target_comp_max',
                                                       'p_target_comp_MAP', 'p_target_comp_MAP_max'])
 
-    objects = ['o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'o8', 'o9', 'o10']
+    objects = ['o1']
+    # objects = ['o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'o8', 'o9', 'o10']
     transformations = ['t1_cs_d1', 't1_cs_d2', 't2_ap_d1', 't2_ap_d2', 't2_mf_d1', 't2_mf_d2', 't2_rp_d1', 't2_rp_d2']
 
     i = 0
     for obj in objects:
         print(obj)
         # load the target object data and samples
-        obj_run = pkl.load(open("{0:s}/{1:s}.pkl".format(samples_folder, obj)))
+        obj_run = MCMCRun.load("{0:s}/{1:s}.pkl".format(samples_folder, obj))
         obj_data = np.load('{0:s}/{1:s}{2:s}.npy'.format(data_folder, obj, append_str))
 
         obj_best_samples = obj_run.best_samples.samples
@@ -190,7 +200,7 @@ if __name__ == "__main__":
                              "where d1.Target = d2.Target and d1.Comparison<d2.Comparison".format(append_str), env=locals())
 
     # write to disk
-    open('I3D{0:s}_ModelPredictions.txt'.format(append_str), 'w').write(predictions.to_string())
+    open('I3D_o1_{0:s}_ModelPredictions.txt'.format(append_str), 'w').write(predictions.to_string())
     # open('../../R/BDAoOSS_Synthetic/I3D{0:s}_ModelPredictions.txt'.format(append_str), 'w').write(predictions.to_string())
-    open('I3D{0:s}_ModelDistances.txt'.format(append_str), 'w').write(df.to_string())
+    open('I3D_o1_{0:s}_ModelDistances.txt'.format(append_str), 'w').write(df.to_string())
 

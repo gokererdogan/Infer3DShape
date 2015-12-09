@@ -48,7 +48,7 @@ class VisionForwardModel:
         self.vtkcamera.SetPosition(self.camera_pos[0])
         self.vtkcamera.SetFocalPoint(0, 0, 0)
         self.vtkcamera.SetViewUp(self.camera_up)
- 
+
         # lighting
         self.light1 = vtk.vtkLight()
         self.light1.SetIntensity(.3)
@@ -66,10 +66,12 @@ class VisionForwardModel:
         self.light4.SetIntensity(.3)
         self.light4.SetPosition(-10, 8, 10)
         self.light4.SetDiffuseColor(1.0, 1.0, 1.0)
+
         self.vtkrenderer.AddLight(self.light1)
         self.vtkrenderer.AddLight(self.light2)
         self.vtkrenderer.AddLight(self.light3)
         self.vtkrenderer.AddLight(self.light4)
+
         self.vtkrenderer.SetBackground(0.0, 0.0, 0.0) # Background color
 
         self.vtkrender_window = vtk.vtkRenderWindow()
@@ -222,12 +224,10 @@ class VisionForwardModel:
             simg = scipy.misc.toimage(np.flipud(img[i]), cmin=0, cmax=255)
             simg.save("{0:s}_{1:d}.{2:s}".format(fn, i, ext))
 
-        
 if __name__ == '__main__':
     forward_model = VisionForwardModel()
 
-    import hypothesis as hyp
-    # parts = [hyp.CuboidPrimitive(position=np.array([0.0, 0.0, 0.0]), size=np.array([1.5, 1.0, 1.0]))]
+    import shape as hyp
     s = hyp.Shape(forward_model)
 
     forward_model.save_render('r.png', s)
