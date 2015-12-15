@@ -217,7 +217,7 @@ def shape_add_remove_part(h, params):
     part_count = len(h.parts)
 
     if part_count > max_part_count:
-        raise ValueError("add/remove part expects shape hypothesis with fewer than {0:s} parts.".format(max_part_count))
+        raise ValueError("add/remove part expects shape hypothesis with fewer than {0:d} parts.".format(max_part_count))
 
     if part_count == 0:
         raise ValueError("add/remove part expects shape hypothesis to have at least 1 part.")
@@ -236,10 +236,13 @@ def shape_add_remove_part(h, params):
         hp.parts.append(new_part)
 
         # q(hp|h)
-        q_hp_h = 0.5
+        # NOTE: this is tricky. q(hp|h) is not simply 1/2. After picking the add move, we also need to pick where to add
+        # the part. This may seem unnecessary but it is NOT. Because we care about which part we remove, we also have to
+        # care about where we add the new part. Therefore, q(hp|h) = 1/2 * (1 / (part_count + 1))
+        q_hp_h = 0.5 * (1.0 / (part_count + 1))
         # if add is the only move possible
         if part_count == 1:
-            q_hp_h = 1.0
+            q_hp_h = 1.0 * (1.0 / (part_count + 1))
 
         # q(h|hp)
         q_h_hp = 0.5 * (1.0 / (part_count + 1))
@@ -251,9 +254,10 @@ def shape_add_remove_part(h, params):
         remove_id = np.random.randint(0, part_count)
         hp.parts.pop(remove_id)
 
-        q_h_hp = 0.5
+        # see the above note in add move
+        q_h_hp = 0.5 * (1.0 / part_count)
         if part_count == 2:
-            q_h_hp = 1.0
+            q_h_hp = 1.0 * (1.0 / part_count)
 
         q_hp_h = 0.5 * (1.0 / part_count)
         # if remove move is the only possible move

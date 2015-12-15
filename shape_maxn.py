@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
     max_part_count = 10
-    h = ShapeMaxN(forward_model=fwm, viewpoint=[(1.5, -1.5, 1.5)], params={'LL_VARIANCE': 0.01}, maxn=max_part_count)
+    h = ShapeMaxN(forward_model=fwm, viewpoint=[(1.5, -1.5, 1.5)], params={'LL_VARIANCE': 0.005}, maxn=max_part_count)
 
     """
     moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part': shape_move_part,
@@ -83,10 +83,10 @@ if __name__ == "__main__":
     moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part_local': shape_move_part_local,
              'shape_change_part_size_local': shape_change_part_size_local, 'change_viewpoint': i3d_proposal.change_viewpoint}
 
-    params = {'MOVE_PART_VARIANCE': 0.01,
-              'MOVE_OBJECT_VARIANCE': 0.01,
-              'CHANGE_SIZE_VARIANCE': 0.01,
-              'CHANGE_VIEWPOINT_VARIANCE': 1000.0,
+    params = {'MOVE_PART_VARIANCE': 0.001,
+              'MOVE_OBJECT_VARIANCE': 0.001,
+              'CHANGE_SIZE_VARIANCE': 0.001,
+              'CHANGE_VIEWPOINT_VARIANCE': 4000.0,
               'MAX_PART_COUNT': max_part_count}
 
     proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
@@ -94,6 +94,6 @@ if __name__ == "__main__":
     data = np.load('data/test1_single_view.npy')
 
     sampler = mcmclib.mh_sampler.MHSampler(h, data, proposal, burn_in=1000, sample_count=10, best_sample_count=10,
-                                           thinning_period=20000, report_period=20000)
+                                           thinning_period=2000, report_period=2000)
 
     run = sampler.sample()

@@ -11,8 +11,27 @@ https://github.com/gokererdogan/
 
 import unittest
 
+from mcmclib.proposal import DeterministicMixtureProposal
+from mcmclib.mh_sampler import MHSampler
+
 from Infer3DShape.shape import *
 from Infer3DShape.shape_maxn import *
+
+class ShapeTestHypothesis(ShapeMaxN):
+    def __init__(self, maxn=3):
+        ShapeMaxN.__init__(self, forward_model=None, maxn=maxn)
+
+    def _calculate_log_likelihood(self, data=None):
+        return 0.0
+
+    def _calculate_log_prior(self):
+        return np.log(1.0 / len(self.parts))
+
+    def copy(self):
+        self_copy = ShapeTestHypothesis(maxn=self.maxn)
+        parts_copy = deepcopy(self.parts)
+        self_copy.parts = parts_copy
+        return self_copy
 
 class ShapeTest(unittest.TestCase):
     def assertNumpyArrayEqual(self, arr1, arr2):
@@ -163,7 +182,7 @@ class ShapeTest(unittest.TestCase):
         sp, p_hp_h, p_h_hp = shape_add_remove_part(s, {})
         self.assertNotEqual(s, sp)
         self.assertEqual(len(sp.parts), 2)
-        self.assertAlmostEqual(p_hp_h, 1.0)
+        self.assertAlmostEqual(p_hp_h, 1.0 / 2.0)
         self.assertAlmostEqual(p_h_hp, 1.0 / 4.0)
         # random object
         s = Shape(forward_model=None)
@@ -172,19 +191,36 @@ class ShapeTest(unittest.TestCase):
         new_part_count = len(sp.parts)
         self.assertIn(new_part_count, [part_count - 1, part_count + 1])
         self.assertNotEqual(s, sp)
-        if new_part_count > part_count: # add move
-            p_hp_h = 0.5
+        if new_part_count > part_count:  # add move
+            p_hp_h = 0.5 * (1.0 / new_part_count)
             p_h_hp = 0.5 * (1.0 / new_part_count)
             if part_count == 1:
-                p_hp_h = 1.0
+                p_hp_h = 1.0 * (1.0 / new_part_count)
         else:
             p_hp_h = 0.5 * (1.0 / part_count)
-            p_h_hp = 0.5
+            p_h_hp = 0.5 * (1.0 / part_count)
             if part_count == 2:
-                p_h_hp = 1.0
+                p_h_hp = 1.0 * (1.0 / part_count)
 
         self.assertAlmostEqual(q_hp_h, p_hp_h)
         self.assertAlmostEqual(q_h_hp, p_h_hp)
+
+        # test if add_remove_part traverses the sample space correctly
+        # look at how much probability mass objects with a certain number of parts get
+        maxn = 3
+        s = ShapeTestHypothesis(maxn)
+        sample_count = 40000
+        p = DeterministicMixtureProposal(moves={'add_remove': shape_add_remove_part}, params={'MAX_PART_COUNT': maxn})
+        sampler = MHSampler(initial_h=s, data=None, proposal=p, burn_in=5000, sample_count=sample_count,
+                            best_sample_count=1, thinning_period=1, report_period=4000)
+        run = sampler.sample()
+        # count how many times we sampled each part_count
+        k = np.array([len(sample.parts) for sample in run.samples.samples])
+        # since the prior p(h) = 1 / part_count and part_count is 1,2 or 3, we expect 6/11 of all samples to have a
+        # single part, 3/11 to have 2 parts, and 2/11 to have 3 parts.
+        self.assertAlmostEqual(np.mean(k == 1), 6.0 / 11.0, places=1)
+        self.assertAlmostEqual(np.mean(k == 2), 3.0 / 11.0, places=1)
+        self.assertAlmostEqual(np.mean(k == 3), 2.0 / 11.0, places=1)
 
     def test_shape_add_remove_part_max_limit(self):
         s = Shape(forward_model=['old'], parts=[], viewpoint=[(1.0, 1.0, 1.0)], params={'x': 1.0})
@@ -208,7 +244,7 @@ class ShapeTest(unittest.TestCase):
         sp, p_hp_h, p_h_hp = shape_add_remove_part(s, {'MAX_PART_COUNT': 2})
         self.assertNotEqual(s, sp)
         self.assertEqual(len(sp.parts), 2)
-        self.assertAlmostEqual(p_hp_h, 1.0)
+        self.assertAlmostEqual(p_hp_h, 1.0 / 2.0)
         self.assertAlmostEqual(p_h_hp, 1.0 / 2.0)
 
         s.parts.append(CuboidPrimitive())
@@ -217,7 +253,7 @@ class ShapeTest(unittest.TestCase):
         self.assertNotEqual(s, sp)
         self.assertEqual(len(sp.parts), 1)
         self.assertAlmostEqual(p_hp_h, 1.0 / 2.0)
-        self.assertAlmostEqual(p_h_hp, 1.0)
+        self.assertAlmostEqual(p_h_hp, 1.0 / 2.0)
 
     def test_shape_move_part(self):
         s = Shape(None)

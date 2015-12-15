@@ -5,9 +5,9 @@ MCMCHypothesis itself, with its own implementations of likelihood, prior etc, bu
 couldn't overwrite them (since in order to overwrite them I had to change some important bits in AoMRShapeGrammar and 
 BDAoOSS). Therefore, I elected to create a new BDAoOSSShape hypothesis using PCFGTree from BDAoOSS and 
 BDAoOSSSpatialModel.~~
-- Use log probabilities instead of probabilities to prevent any under/overflow errors.
-- Split the base MCMC stuff into a separate project
-- Add unit tests
+- ~~Use log probabilities instead of probabilities to prevent any under/overflow errors.~~
+- ~~Split the base MCMC stuff into a separate project~~
+- ~~Add unit tests~~
 - Write documentation
 - You shouldn't need to traverse the whole tree every time you need to add/remove parts. We can keep a list of 
 candidate nodes that is continually updated. Similarly for depth, we don't need re-calculate it every time we 
