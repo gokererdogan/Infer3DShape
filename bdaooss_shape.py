@@ -45,7 +45,7 @@ class BDAoOSSShape(hyp.I3DHypothesis):
         # prior = prob. of parse tree * prob. of spatial model
         # NOTE that instead of rational rules prior (which integrates out
         # production probabilities) we use the derivation prob. as prior.
-        return np.log(self.shape.derivation_prob) + np.log(self.shape.spatial_model.probability())
+        return np.log(self.shape.probability()) + np.log(self.shape.spatial_model.probability())
 
     def convert_to_positions_sizes(self):
         """
@@ -98,6 +98,7 @@ class BDAoOSSShape(hyp.I3DHypothesis):
         # we cannot pickle VTKObjects, so get rid of them.
         return {k: v for k, v in self.__dict__.iteritems() if k != 'forward_model'}
 
+
 # PROPOSAL FUNCTIONS
 def bdaooss_add_remove_part(h, params):
     max_depth = np.inf
@@ -112,7 +113,7 @@ def bdaooss_add_remove_part(h, params):
     depth = hp.shape.get_depth()
 
     if depth > max_depth:
-        raise ValueError("add/remove part expects shape hypothesis with depth less than {0:s}.".format(max_depth))
+        raise ValueError("add/remove part expects shape hypothesis with depth less than {0:d}.".format(max_depth))
 
     # we cannot add or remove parts if max_depth is 1.
     if max_depth == 1:
@@ -231,6 +232,7 @@ def bdaooss_add_remove_part(h, params):
 
         return hp, p_hp_h, p_h_hp
 
+
 def bdaooss_change_part_size(h, params):
     hp = h.copy()
     sm = hp.shape.spatial_model
@@ -242,6 +244,7 @@ def bdaooss_change_part_size(h, params):
     p_hp_h = 1.0
     p_h_hp = 1.0
     return hp, p_hp_h, p_h_hp
+
 
 def bdaooss_change_part_size_local(h, params):
     hp = h.copy()
@@ -259,6 +262,7 @@ def bdaooss_change_part_size_local(h, params):
 
     return hp, 1.0, 1.0
 
+
 def bdaooss_change_part_dock_face(h, params):
     hp = h.copy()
     sm = hp.shape.spatial_model
@@ -273,6 +277,7 @@ def bdaooss_change_part_dock_face(h, params):
     p_h_hp = 1.0
     return hp, p_hp_h, p_h_hp
 
+
 def bdaooss_move_object(h, params):
     hp = h.copy()
     sm = hp.shape.spatial_model
@@ -283,9 +288,10 @@ def bdaooss_move_object(h, params):
             return hp, 1.0, 1.0
     # if updated position is in bounds
     for part in sm.spatial_states.values():
-        part.position = part.position + change
+        part.position += change
     # proposal is symmetric; hence, q(hp|h) = q(h|hp)
     return hp, 1.0, 1.0
+
 
 if __name__ == "__main__":
     import vision_forward_model as vfm
@@ -294,16 +300,23 @@ if __name__ == "__main__":
     import i3d_proposal
 
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
-    h = BDAoOSSShape(forward_model=fwm, viewpoint=[(1.5, -1.5, 1.5)], params={'LL_VARIANCE': 0.001})
+    h = BDAoOSSShape(forward_model=fwm, viewpoint=[(1.5, -1.5, 1.5)], params={'LL_VARIANCE': 0.01})
 
+    """
     moves = {'bdaooss_add_remove_part': bdaooss_add_remove_part, 'bdaooss_change_part_size': bdaooss_change_part_size,
              'bdaooss_change_part_size_local': bdaooss_change_part_size_local,
              'bdaooss_change_part_dock_face': bdaooss_change_part_dock_face,
              'bdaooss_move_object': bdaooss_move_object, 'change_viewpoint': i3d_proposal.change_viewpoint}
+             """
+
+    moves = {'bdaooss_add_remove_part': bdaooss_add_remove_part,
+             'bdaooss_change_part_size_local': bdaooss_change_part_size_local,
+             'bdaooss_change_part_dock_face': bdaooss_change_part_dock_face,
+             'change_viewpoint': i3d_proposal.change_viewpoint}
 
     params = {'MOVE_OBJECT_VARIANCE': 0.01,
               'CHANGE_SIZE_VARIANCE': 0.01,
-              'CHANGE_VIEWPOINT_VARIANCE': 300.0}
+              'CHANGE_VIEWPOINT_VARIANCE': 2000.0}
 
     proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
 

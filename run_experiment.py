@@ -82,7 +82,7 @@ def run_chain(**kwargs):
     moves = {}
     if single_view:
         import i3d_proposal
-        viewpoint = [(1.5, -1.5, 1.5)]
+        viewpoint = [(1.5 * np.sqrt(2.0), -1.5 * np.sqrt(2.0), 1.5)]
         moves['change_viewpoint'] = i3d_proposal.change_viewpoint
     else:
         viewpoint = None
@@ -91,11 +91,11 @@ def run_chain(**kwargs):
         import shape
         h = shape.Shape(forward_model=fwm, viewpoint=viewpoint, params=shape_params)
         moves['shape_add_remove_part'] = shape.shape_add_remove_part
-        moves['shape_move_part'] = shape.shape_move_part
+        # moves['shape_move_part'] = shape.shape_move_part
         moves['shape_move_part_local'] = shape.shape_move_part_local
-        moves['shape_change_part_size'] = shape.shape_change_part_size
+        # moves['shape_change_part_size'] = shape.shape_change_part_size
         moves['shape_change_part_size_local'] = shape.shape_change_part_size_local
-        moves['shape_move_object'] = shape.shape_move_object
+        # moves['shape_move_object'] = shape.shape_move_object
         kernel = proposal.RandomMixtureProposal(moves=moves, params=kernel_params)
     elif hypothesis_class == 'ShapeMaxN':
         import shape
@@ -113,10 +113,10 @@ def run_chain(**kwargs):
         import bdaooss_shape as bdaooss
         h = bdaooss.BDAoOSSShape(forward_model=fwm, viewpoint=viewpoint, params=shape_params)
         moves['bdaooss_add_remove_part'] = bdaooss.bdaooss_add_remove_part
-        moves['bdaooss_change_part_size'] = bdaooss.bdaooss_change_part_size
+        # moves['bdaooss_change_part_size'] = bdaooss.bdaooss_change_part_size
         moves['bdaooss_change_part_size_local'] = bdaooss.bdaooss_change_part_size_local
         moves['bdaooss_change_part_dock_face'] = bdaooss.bdaooss_change_part_dock_face
-        moves['bdaooss_move_object'] = bdaooss.bdaooss_move_object
+        # moves['bdaooss_move_object'] = bdaooss.bdaooss_move_object
         kernel = proposal.RandomMixtureProposal(moves=moves, params=kernel_params)
     elif hypothesis_class == 'BDAoOSSShapeMaxD':
         import bdaooss_shape as bdaooss
@@ -124,10 +124,10 @@ def run_chain(**kwargs):
         h = bdaooss_maxd.BDAoOSSShapeMaxD(forward_model=fwm, max_depth=max_depth, viewpoint=viewpoint,
                                           params=shape_params)
         moves['bdaooss_add_remove_part'] = bdaooss.bdaooss_add_remove_part
-        moves['bdaooss_change_part_size'] = bdaooss.bdaooss_change_part_size
+        # moves['bdaooss_change_part_size'] = bdaooss.bdaooss_change_part_size
         moves['bdaooss_change_part_size_local'] = bdaooss.bdaooss_change_part_size_local
         moves['bdaooss_change_part_dock_face'] = bdaooss.bdaooss_change_part_dock_face
-        moves['bdaooss_move_object'] = bdaooss.bdaooss_move_object
+        # moves['bdaooss_move_object'] = bdaooss.bdaooss_move_object
         kernel_params['MAX_DEPTH'] = max_depth
         kernel = proposal.RandomMixtureProposal(moves=moves, params=kernel_params)
     else:
@@ -192,7 +192,7 @@ def run_chain(**kwargs):
 
 if __name__ == "__main__":
     ADD_PART_PROB = 0.6
-    LL_VARIANCE = 0.0005  # in squared pixel distance
+    LL_VARIANCE = 0.001  # in squared pixel distance
     MAX_PIXEL_VALUE = 175.0  # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
     LL_FILTER_SIGMA = 2.0
     MOVE_PART_VARIANCE = 0.002
@@ -200,13 +200,13 @@ if __name__ == "__main__":
     CHANGE_SIZE_VARIANCE = 0.002
     CHANGE_VIEWPOINT_VARIANCE = 2000.0
 
-    experiment = exp.Experiment(name="TestObjects2", experiment_method=run_chain, single_view=True,
-                                hypothesis_class=['ShapeMaxN'],
-                                input_file=['test2'],
+    experiment = exp.Experiment(name="TestObjectsNoBug", experiment_method=run_chain, single_view=True,
+                                hypothesis_class=['Shape', 'ShapeMaxN', 'BDAoOSSShape', 'BDAoOSSShapeMaxD'],
+                                input_file=['test1'],
                                 results_folder='./results',
                                 data_folder='./data', render_size=(200, 200),
                                 max_part_count=10, max_depth=10,
-                                add_part_prob=ADD_PART_PROB, ll_variance=[0.01, 0.001, 0.0001],
+                                add_part_prob=ADD_PART_PROB, ll_variance=LL_VARIANCE,
                                 max_pixel_value=MAX_PIXEL_VALUE,
                                 change_size_variance=CHANGE_SIZE_VARIANCE,
                                 change_viewpoint_variance=CHANGE_VIEWPOINT_VARIANCE,
@@ -215,11 +215,11 @@ if __name__ == "__main__":
                                 burn_in=0, sample_count=10, best_sample_count=20, thinning_period=20000,
                                 report_period=10000)
 
-    experiment.run(parallel=True, num_processes=3)
+    experiment.run(parallel=True, num_processes=4)
 
     print(experiment.results)
     experiment.save('./results')
-    experiment.append_csv('./results/TestObjects2.csv')
+    experiment.append_csv('./results/TestObjectsNoBug.csv')
     
     """
     input_file=['o1', 'o1_t1_cs_d1', 'o1_t1_cs_d2',

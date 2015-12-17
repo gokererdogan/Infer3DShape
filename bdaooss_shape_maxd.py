@@ -14,6 +14,7 @@ from copy import deepcopy
 
 from bdaooss_shape import BDAoOSSShape
 
+
 class BDAoOSSShapeMaxD(BDAoOSSShape):
     """Shape hypothesis class based on BDAoOSS Shape grammar. This class assumes a maximum depth to parse trees and
     uses a new prior distribution over hypotheses.
@@ -42,7 +43,10 @@ class BDAoOSSShapeMaxD(BDAoOSSShape):
         Returns:
             (float): log prior for the hypothesis.
         """
-        return len(self.shape.spatial_model.spatial_states) * np.log(1.0 / 20.0)
+        # assume a uniform prior over number of parts. we can achieve this by letting the derivation prob. for all
+        # trees to be equal. Note that we still have to keep the spatial model probability as there are many hypotheses
+        # with the same number of parts but with different spatial models.
+        return np.log(self.shape.spatial_model.probability())
 
     def copy(self):
         # NOTE that we are not copying params. This assumes that params do not change from

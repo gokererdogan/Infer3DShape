@@ -13,9 +13,23 @@ import unittest
 
 import treelib
 import BDAoOSS.bdaooss_grammar as bd
+from mcmclib.proposal import DeterministicMixtureProposal
+from mcmclib.mh_sampler import MHSampler
 
 from Infer3DShape.bdaooss_shape import *
 from Infer3DShape.bdaooss_shape_maxd import *
+
+
+class BDAoOSSShapeTestHypothesis(BDAoOSSShape):
+    def __init__(self, shape=None):
+        BDAoOSSShape.__init__(self, forward_model=None, shape=shape)
+
+    def _calculate_log_likelihood(self, data=None):
+        return 0.0
+
+    def copy(self):
+        shape_copy = self.shape.copy()
+        return BDAoOSSShapeTestHypothesis(shape=shape_copy)
 
 class BDAoOSSShapeTest(unittest.TestCase):
     def assertNumpyArrayEqual(self, arr1, arr2):
@@ -91,6 +105,8 @@ class BDAoOSSShapeTest(unittest.TestCase):
 
     def test_bdaooss_prior(self):
         self.assertAlmostEqual(self.h1.log_prior(), np.log(1.0 / 4.0))
+        h, p1, p2 = bdaooss_add_remove_part(self.h1, params=None)
+        self.assertAlmostEqual(h.log_prior(), np.log(1.0 / (4.0 * 4.0 * 6.0)))
         self.assertAlmostEqual(self.h2.log_prior(), np.log((1.0 / 4.0)**4 * (1.0 / 20.0)))
 
     def test_bdaooss_convert_to_parts_positions(self):
@@ -133,9 +149,9 @@ class BDAoOSSShapeTest(unittest.TestCase):
 
     def test_bdaooss_maxd_prior(self):
         h1 = BDAoOSSShapeMaxD(None, shape=self.h1.shape)
-        self.assertAlmostEqual(h1.log_prior(), np.log((1.0 / 20.0)))
+        self.assertAlmostEqual(h1.log_prior(), np.log(1.0))
         h2 = BDAoOSSShapeMaxD(None, shape=self.h2.shape)
-        self.assertAlmostEqual(h2.log_prior(), np.log((1.0 / 20.0)**4))
+        self.assertAlmostEqual(h2.log_prior(), np.log((1.0 / 20.0)))
 
     def test_bdaooss_add_remove_part(self):
         # test with no max_depth limit
@@ -182,6 +198,26 @@ class BDAoOSSShapeTest(unittest.TestCase):
         self.assertAlmostEqual(p_hp_h, (1.0 / 3.0))
         self.assertAlmostEqual(p_h_hp, (1.0 / 2.0) * (1.0 / 4.0))
         self.assertEqual(len(hp.shape.spatial_model.spatial_states['n1'].occupied_faces), 2)
+
+    def test_bdaooss_add_remove_sample(self):
+        # test if add_remove samples correctly
+        # sample from the prior using add_remove and see if we get each tree with its expected probability.
+        # here we constrain depth to 1; so, there are 4 possible trees: P, P->P, P->[P, P], P->[P, P, P].
+        # p({P}) = 1/4, p({P->P}) = 1/16, p({P->{P, P}) = 1/64, p({P->{P,P,P}) = 1/256
+        # therefore, we expect to see P 64/85 of the time, P->P 16/85 of the time, P->[P, P] 4/85 of the time, and
+        # P->[P, P, P] 1/85 of the time.
+        h = BDAoOSSShapeTestHypothesis(shape=self.h1.shape)
+        p = DeterministicMixtureProposal(moves={'add_remove': bdaooss_add_remove_part}, params={'MAX_DEPTH': 2})
+        sampler = MHSampler(initial_h=h, proposal=p, data=None, burn_in=0, sample_count=50000, best_sample_count=1,
+                            thinning_period=1, report_period=5000)
+        run = sampler.sample()
+
+        k = np.array([len(s.shape.spatial_model.spatial_states) for s in run.samples.samples])
+
+        self.assertAlmostEqual(np.mean(k == 1), 64/85.0, places=1)
+        self.assertAlmostEqual(np.mean(k == 2), 16/85.0, places=1)
+        self.assertAlmostEqual(np.mean(k == 3), 4/85.0, places=1)
+        self.assertAlmostEqual(np.mean(k == 4), 1/85.0, places=1)
 
     def test_bdaooss_change_part_size(self):
         hp, p_hp_h, p_h_hp = bdaooss_change_part_size(self.h1, None)

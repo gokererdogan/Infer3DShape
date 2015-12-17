@@ -17,9 +17,10 @@ from mcmclib.mh_sampler import MHSampler
 from Infer3DShape.shape import *
 from Infer3DShape.shape_maxn import *
 
+
 class ShapeTestHypothesis(ShapeMaxN):
-    def __init__(self, maxn=3):
-        ShapeMaxN.__init__(self, forward_model=None, maxn=maxn)
+    def __init__(self, maxn=3, parts=None):
+        ShapeMaxN.__init__(self, forward_model=None, maxn=maxn, parts=parts)
 
     def _calculate_log_likelihood(self, data=None):
         return 0.0
@@ -33,6 +34,7 @@ class ShapeTestHypothesis(ShapeMaxN):
         self_copy.parts = parts_copy
         return self_copy
 
+
 class ShapeTest(unittest.TestCase):
     def assertNumpyArrayEqual(self, arr1, arr2):
         if np.any(arr1 != arr2):
@@ -43,7 +45,7 @@ class ShapeTest(unittest.TestCase):
             raise AssertionError("Numpy arrays are equal: {0:s} - {1:s}".format(arr1, arr2))
 
     def test_cuboid_primitive(self):
-        self.assertRaises(ValueError, CuboidPrimitive, position=(-1.0, 0.0, 0.0), size=(0.2, 0.2, 0.2))
+        self.assertRaises(ValueError, CuboidPrimitive, position=(-2.0, 0.0, 0.0), size=(0.2, 0.2, 0.2))
         self.assertRaises(ValueError, CuboidPrimitive, position=(0.0, 0.0, 0.0), size=(-0.2, 0.2, 0.2))
         pos = (0.0, 0.0, 0.0)
         size = (0.2, 0.2, 0.2)
@@ -208,7 +210,7 @@ class ShapeTest(unittest.TestCase):
         # test if add_remove_part traverses the sample space correctly
         # look at how much probability mass objects with a certain number of parts get
         maxn = 3
-        s = ShapeTestHypothesis(maxn)
+        s = ShapeTestHypothesis(parts=[CuboidPrimitive()], maxn=3)
         sample_count = 40000
         p = DeterministicMixtureProposal(moves={'add_remove': shape_add_remove_part}, params={'MAX_PART_COUNT': maxn})
         sampler = MHSampler(initial_h=s, data=None, proposal=p, burn_in=5000, sample_count=sample_count,

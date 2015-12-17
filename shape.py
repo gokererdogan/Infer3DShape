@@ -26,17 +26,17 @@ class CuboidPrimitive(object):
     size.
 
     Attributes:
-        position (3x1-ndarray): Position of primitive, sampled from ~ Unif(-0.5,0.5)
+        position (3x1-ndarray): Position of primitive, sampled from ~ Unif(1.0, 1.0)
         size (3x1-ndarray): Size of primitive, sampled from ~ Unif(0,1)
     """
     def __init__(self, position=None, size=None):
         if position is None:
             # randomly pick position
-            position = (np.random.rand(3) - 0.5)
+            position = np.random.rand(3)
         else:
             position = np.array(position)
-            if np.any(np.abs(position) > 0.5):
-                raise ValueError("Position must be in [-0.5, 0.5]")
+            if np.any(np.abs(position) > 1.0):
+                raise ValueError("Position must be in [-1.0, 1.0]")
 
         if size is None:
             # randomly pick size
@@ -207,6 +207,7 @@ class Shape(hyp.I3DHypothesis):
             arr[0, ((6 * i) + 3):((6 * i) + 6)] = p.size
         return arr
 
+
 # Proposal functions
 def shape_add_remove_part(h, params):
     max_part_count = np.inf
@@ -266,13 +267,15 @@ def shape_add_remove_part(h, params):
 
     return hp, q_hp_h, q_h_hp
 
+
 def shape_move_part(h, params):
     hp = h.copy()
     part_count = len(h.parts)
     part_id = np.random.randint(0, part_count)
-    hp.parts[part_id].position = (np.random.rand(3) - 0.5)
+    hp.parts[part_id].position = np.random.rand(3)
     # q(h|hp) = q(hp|h), that is why we simply set both q(.|.) to 1.
     return hp, 1.0, 1.0
+
 
 def shape_move_part_local(h, params):
     hp = h.copy()
@@ -280,23 +283,25 @@ def shape_move_part_local(h, params):
     part_id = np.random.randint(0, part_count)
     change = np.random.randn(3) * np.sqrt(params['MOVE_PART_VARIANCE'])
     # if proposed position is not out of bounds ([-0.5, 0.5])
-    if np.all((hp.parts[part_id].position + change) < 0.5) and np.all((hp.parts[part_id].position + change) > -0.5):
-        hp.parts[part_id].position = hp.parts[part_id].position + change
+    if np.all((hp.parts[part_id].position + change) < 1.0) and np.all((hp.parts[part_id].position + change) > -1.0):
+        hp.parts[part_id].position += change
     # proposal is symmetric; hence, q(hp|h) = q(h|hp)
     return hp, 1.0, 1.0
+
 
 def shape_move_object(h, params):
     hp = h.copy()
     change = np.random.randn(3) * np.sqrt(params['MOVE_OBJECT_VARIANCE'])
-    # if proposed position is out of bounds ([-0.5, 0.5])
+    # if proposed position is out of bounds ([-1.0, 1.0])
     for part in hp.parts:
-        if np.any((part.position + change) > 0.5) or np.any((part.position + change) < -0.5):
+        if np.any((part.position + change) > 1.0) or np.any((part.position + change) < -1.0):
             return hp, 1.0, 1.0
     # if updated position is in bounds
     for part in hp.parts:
-        part.position = part.position + change
+        part.position += change
     # proposal is symmetric; hence, q(hp|h) = q(h|hp)
     return hp, 1.0, 1.0
+
 
 def shape_change_part_size(h, params):
     hp = h.copy()
@@ -305,6 +310,7 @@ def shape_change_part_size(h, params):
     hp.parts[part_id].size = np.random.rand(3)
     return hp, 1.0, 1.0
 
+
 def shape_change_part_size_local(h, params):
     hp = h.copy()
     part_count = len(h.parts)
@@ -312,7 +318,7 @@ def shape_change_part_size_local(h, params):
     change = np.random.randn(3) * np.sqrt(params['CHANGE_SIZE_VARIANCE'])
     # if proposed size is not out of bounds ([0, 1])
     if np.all((hp.parts[part_id].size + change) < 1.0) and np.all((hp.parts[part_id].size + change) > 0.0):
-        hp.parts[part_id].size = hp.parts[part_id].size + change
+        hp.parts[part_id].size += change
     return hp, 1.0, 1.0
 
 if __name__ == "__main__":
@@ -322,17 +328,24 @@ if __name__ == "__main__":
     import i3d_proposal
 
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
-    h = Shape(forward_model=fwm, viewpoint=[(1.5, -1.5, 1.5)], params={'LL_VARIANCE': 0.001})
+    h = Shape(forward_model=fwm, viewpoint=[(1.5 * np.sqrt(2.), -1.5 * np.sqrt(2.), 1.5)],
+              params={'LL_VARIANCE': 0.001})
 
+    """
     moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part': shape_move_part,
              'shape_move_part_local': shape_move_part_local, 'shape_change_part_size': shape_change_part_size,
              'shape_change_part_size_local': shape_change_part_size_local, 'shape_move_object': shape_move_object,
              'change_viewpoint': i3d_proposal.change_viewpoint}
+             """
 
-    params = {'MOVE_PART_VARIANCE': 0.01,
-              'MOVE_OBJECT_VARIANCE': 0.01,
-              'CHANGE_SIZE_VARIANCE': 0.01,
-              'CHANGE_VIEWPOINT_VARIANCE': 300.0}
+    moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part_local': shape_move_part_local,
+             'shape_change_part_size_local': shape_change_part_size_local,
+             'change_viewpoint': i3d_proposal.change_viewpoint}
+
+    params = {'MOVE_PART_VARIANCE': 0.001,
+              'MOVE_OBJECT_VARIANCE': 0.001,
+              'CHANGE_SIZE_VARIANCE': 0.001,
+              'CHANGE_VIEWPOINT_VARIANCE': 4000.0}
 
     proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
 

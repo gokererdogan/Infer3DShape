@@ -10,8 +10,8 @@ https://github.com/gokererdogan/
 """
 from shape import *
 
-def get_random_viewpoint():
-    angle = np.random.randint(0, 360)
+
+def get_viewpoint(angle):
     x = 1.5 * np.sqrt(2.0) * np.cos(angle / 180.0 * np.pi)
     y = 1.5 * np.sqrt(2.0) * np.sin(angle / 180.0 * np.pi)
     viewpoint = [(x, y, 1.5)]
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.5, .75/2, .75/2])),
              CuboidPrimitive(np.array([.75/2, 0.0, 0.0]), np.array([.25, .25, .25]))]
 
-    viewpoint = get_random_viewpoint()
+    viewpoint = get_viewpoint(262)
     h = Shape(fwm, parts=parts, viewpoint=viewpoint)
     # fwm._view(h)
     img = fwm.render(h)
@@ -37,7 +37,7 @@ if __name__ == "__main__":
              CuboidPrimitive(np.array([0.0, 0.0, 0.75/2]), np.array([0.25/2, 0.35/2, .75/2])),
              CuboidPrimitive(np.array([0.0, 0.2, 0.75/2]), np.array([.1, .45/2, .25/2]))]
 
-    viewpoint = get_random_viewpoint()
+    viewpoint = get_viewpoint(296)
     h = Shape(fwm, parts=parts, viewpoint=viewpoint)
     # fwm._view(h)
     img = fwm.render(h)
@@ -52,7 +52,7 @@ if __name__ == "__main__":
              CuboidPrimitive(np.array([-0.25, 0.0, 0.15]), np.array([0.3, 0.3, 0.3])),
              CuboidPrimitive(np.array([-0.25, -0.25, 0.2]), np.array([0.1, 0.2, 0.1]))]
 
-    viewpoint = get_random_viewpoint()
+    viewpoint = get_viewpoint(7)
     h = Shape(fwm, parts=parts, viewpoint=viewpoint)
     # fwm._view(h)
     img = fwm.render(h)

@@ -9,43 +9,57 @@ Goker Erdogan
 https://github.com/gokererdogan/
 """
 
-import hypothesis as hyp
-import vision_forward_model as vfm
 import numpy as np
 
-hyp.LL_VARIANCE = 0.002
+import vision_forward_model as vfm
+import shape
 
-fwm = vfm.VisionForwardModel()
+
+LL_VARIANCE = 0.001
+
+fwm = vfm.VisionForwardModel(render_size=(200, 200))
+params = {'LL_VARIANCE': LL_VARIANCE}
 
 # test object 1
 print('Test object 1')
 
-parts = [hyp.CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([1.0, .75, .75])),
-         hyp.CuboidPrimitive(np.array([.75, 0.0, 0.0]), np.array([.5, .5, .5]))]
+view_angle = 262.0
+viewpoint_x = 1.5 * np.sqrt(2.0) * np.cos(view_angle * np.pi / 180.0)
+viewpoint_y = 1.5 * np.sqrt(2.0) * np.sin(view_angle * np.pi / 180.0)
+viewpoint_z = 1.5
+viewpoint = [(viewpoint_x, viewpoint_y, viewpoint_z)]
 
-gt = hyp.Shape(fwm, parts)
-data = np.load('./data/test1.npy')
+parts = [shape.CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.5, .375, .375])),
+         shape.CuboidPrimitive(np.array([.375, 0.0, 0.0]), np.array([.25, .25, .25]))]
 
-print("prior: {0:e}, ll: {1:e}, post: {2:e}".format(gt.prior(), gt.likelihood(data), gt.prior() * gt.likelihood(data)))
+gt = shape.Shape(forward_model=fwm, parts=parts, viewpoint=viewpoint, params=params)
+data = np.load('./data/test1_single_view.npy')
 
-parts = [hyp.CuboidPrimitive(np.array([0.19, 0.0, 0.0]), np.array([1.38, .75, .75]))]
+print("prior: {0:f}, ll: {1:f}, post: {2:f}".format(gt.log_prior(), gt.log_likelihood(data),
+                                                    gt.log_prior() + gt.log_likelihood(data)))
 
-h1 = hyp.Shape(fwm, parts)
+
+parts = [shape.CuboidPrimitive(np.array([0.095, 0.0, 0.0]), np.array([0.69, .375, .375]))]
+
+h1 = shape.Shape(forward_model=fwm, parts=parts, viewpoint=viewpoint, params=params)
 h1_data = fwm.render(h1)
 # fwm.save_render("1_1.png", h1)
 
-print("prior: {0:e}, ll: {1:e}, post: {2:e}".format(h1.prior(), h1.likelihood(data), h1.prior() * h1.likelihood(data)))
+print("prior: {0:f}, ll: {1:f}, post: {2:f}".format(h1.log_prior(), h1.log_likelihood(data),
+                                                    h1.log_prior() + h1.log_likelihood(data)))
 
-parts = [hyp.CuboidPrimitive(np.array([0.1, 0.0, 0.0]), np.array([1.2, .75, .75])),
-         hyp.CuboidPrimitive(np.array([.8, 0.0, 0.0]), np.array([.6, .55, .5]))]
 
-h2 = hyp.Shape(fwm, parts)
+parts = [shape.CuboidPrimitive(np.array([0.05, 0.0, 0.0]), np.array([0.6, .375, .375])),
+         shape.CuboidPrimitive(np.array([.4, 0.0, 0.0]), np.array([.3, .275, .25]))]
+
+h2 = shape.Shape(forward_model=fwm, parts=parts, viewpoint=viewpoint, params=params)
 h2_data = fwm.render(h2)
 # fwm.save_render("1_2.png", h2)
 
-print("prior: {0:e}, ll: {1:e}, post: {2:e}".format(h2.prior(), h2.likelihood(data), h2.prior() * h2.likelihood(data)))
+print("prior: {0:f}, ll: {1:f}, post: {2:f}".format(h2.log_prior(), h2.log_likelihood(data),
+                                                    h2.log_prior() + h2.log_likelihood(data)))
 
-
+"""
 # test object 2
 print("\nTest object 2")
 parts = [hyp.CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([1.0, .75, .75])),
@@ -79,7 +93,7 @@ h2_2_data = fwm.render(h2_2)
 # fwm.save_render("2_2.png", h2_2)
 
 print("prior: {0:e}, ll: {1:e}, post: {2:e}".format(h2_2.prior(), h2_2.likelihood(data2), h2_2.prior() * h2_2.likelihood(data2)))
-
+"""
 '''
 import skimage as ski
 import skimage.feature as skif
@@ -122,9 +136,10 @@ import skimage.io as skiio
 # posterior, you need to make sure that the chain can travel around the space as freely as possible. but, as you
 # decrease s, you are making this harder and harder because even small increases in d matter quite a lot. hence, you
 # will not be able to accept that slightly more wrong but crucial hypothesis that leads to higher posterior regions.
-
+"""
 k = 2.0
 s = 0.0001 # this seems like a decent value
 mind = np.sqrt(2*s*np.log(k))
 d = np.linspace(mind, 1.0)
 dd = d - np.sqrt(d**2 - (2*s*np.log(k)))
+"""
