@@ -12,9 +12,9 @@ from shape import *
 
 
 def get_viewpoint(angle):
-    x = 1.5 * np.sqrt(2.0) * np.cos(angle / 180.0 * np.pi)
-    y = 1.5 * np.sqrt(2.0) * np.sin(angle / 180.0 * np.pi)
-    viewpoint = [(x, y, 1.5)]
+    x = 2.0 * np.cos(angle / 180.0 * np.pi)
+    y = 2.0 * np.sin(angle / 180.0 * np.pi)
+    viewpoint = [(x, y, 2.0)]
     return viewpoint
 
 if __name__ == "__main__":

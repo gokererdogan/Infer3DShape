@@ -17,7 +17,7 @@ import scipy.misc
 from gmllib.helpers import rgb2gray
 
 # canonical view +- 45 degrees
-DEFAULT_CAMERA_POS = [(1.5 * np.sqrt(2.0), -1.5 * np.sqrt(2.0), 1.5)]
+DEFAULT_CAMERA_POS = [(np.sqrt(2.0), -np.sqrt(2.0), 2.0)]
 DEFAULT_RENDER_SIZE = (200, 200)
 DEFAULT_CAMERA_UP = (0, 0, 1)
 
@@ -49,6 +49,8 @@ class VisionForwardModel:
         self.vtkcamera.SetPosition(self.camera_pos[0])
         self.vtkcamera.SetFocalPoint(0, 0, 0)
         self.vtkcamera.SetViewUp(self.camera_up)
+        # this is the view angle we used for rendering objects in blender.
+        self.vtkcamera.SetViewAngle(35.0)
 
         # lighting
         self.light1 = vtk.vtkLight()

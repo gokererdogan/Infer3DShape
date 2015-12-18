@@ -46,6 +46,8 @@ class BDAoOSSShapeMaxD(BDAoOSSShape):
         # assume a uniform prior over number of parts. we can achieve this by letting the derivation prob. for all
         # trees to be equal. Note that we still have to keep the spatial model probability as there are many hypotheses
         # with the same number of parts but with different spatial models.
+        # NOTE this prior will lead to chains that are potentially quite slow since the chain will spend an equal
+        # amount of time sampling quite large trees as it does sampling small trees.
         return np.log(self.shape.spatial_model.probability())
 
     def copy(self):

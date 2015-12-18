@@ -32,7 +32,7 @@ class CuboidPrimitive(object):
     def __init__(self, position=None, size=None):
         if position is None:
             # randomly pick position
-            position = np.random.rand(3)
+            position = (np.random.rand(3) * 2) - 1.0
         else:
             position = np.array(position)
             if np.any(np.abs(position) > 1.0):
@@ -329,7 +329,7 @@ if __name__ == "__main__":
 
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
     h = Shape(forward_model=fwm, viewpoint=[(1.5 * np.sqrt(2.), -1.5 * np.sqrt(2.), 1.5)],
-              params={'LL_VARIANCE': 0.001})
+              params={'LL_VARIANCE': 0.0001})
 
     """
     moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part': shape_move_part,
@@ -338,14 +338,15 @@ if __name__ == "__main__":
              'change_viewpoint': i3d_proposal.change_viewpoint}
              """
 
-    moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part_local': shape_move_part_local,
+    moves = {'shape_add_remove_part': shape_add_remove_part,
+             'shape_move_part_local': shape_move_part_local,
              'shape_change_part_size_local': shape_change_part_size_local,
              'change_viewpoint': i3d_proposal.change_viewpoint}
 
-    params = {'MOVE_PART_VARIANCE': 0.001,
-              'MOVE_OBJECT_VARIANCE': 0.001,
-              'CHANGE_SIZE_VARIANCE': 0.001,
-              'CHANGE_VIEWPOINT_VARIANCE': 4000.0}
+    params = {'MOVE_PART_VARIANCE': 0.0001,
+              'MOVE_OBJECT_VARIANCE': 0.0001,
+              'CHANGE_SIZE_VARIANCE': 0.0001,
+              'CHANGE_VIEWPOINT_VARIANCE': 50.0}
 
     proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
 

@@ -82,7 +82,7 @@ def run_chain(**kwargs):
     moves = {}
     if single_view:
         import i3d_proposal
-        viewpoint = [(1.5 * np.sqrt(2.0), -1.5 * np.sqrt(2.0), 1.5)]
+        viewpoint = [(np.sqrt(2.0), -np.sqrt(2.0), 2.0)]
         moves['change_viewpoint'] = i3d_proposal.change_viewpoint
     else:
         viewpoint = None
@@ -192,17 +192,17 @@ def run_chain(**kwargs):
 
 if __name__ == "__main__":
     ADD_PART_PROB = 0.6
-    LL_VARIANCE = 0.001  # in squared pixel distance
+    LL_VARIANCE = 0.0001  # in squared pixel distance
     MAX_PIXEL_VALUE = 175.0  # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
     LL_FILTER_SIGMA = 2.0
-    MOVE_PART_VARIANCE = 0.002
-    MOVE_OBJECT_VARIANCE = 0.002
-    CHANGE_SIZE_VARIANCE = 0.002
-    CHANGE_VIEWPOINT_VARIANCE = 2000.0
+    MOVE_PART_VARIANCE = 0.0001
+    MOVE_OBJECT_VARIANCE = 0.0001
+    CHANGE_SIZE_VARIANCE = 0.0001
+    CHANGE_VIEWPOINT_VARIANCE = 50.0
 
     experiment = exp.Experiment(name="TestObjectsNoBug", experiment_method=run_chain, single_view=True,
-                                hypothesis_class=['Shape', 'ShapeMaxN', 'BDAoOSSShape', 'BDAoOSSShapeMaxD'],
-                                input_file=['test1'],
+                                hypothesis_class=['Shape', 'ShapeMaxN', 'BDAoOSSShape'],
+                                input_file=['test2', 'test3'],
                                 results_folder='./results',
                                 data_folder='./data', render_size=(200, 200),
                                 max_part_count=10, max_depth=10,
@@ -215,7 +215,7 @@ if __name__ == "__main__":
                                 burn_in=0, sample_count=10, best_sample_count=20, thinning_period=20000,
                                 report_period=10000)
 
-    experiment.run(parallel=True, num_processes=4)
+    experiment.run(parallel=True, num_processes=6)
 
     print(experiment.results)
     experiment.save('./results')
