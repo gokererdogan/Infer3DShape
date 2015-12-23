@@ -322,13 +322,13 @@ def shape_change_part_size_local(h, params):
     return hp, 1.0, 1.0
 
 if __name__ == "__main__":
+    # common setup
     import vision_forward_model as vfm
     import mcmclib.proposal
-    import mcmclib.mh_sampler
     import i3d_proposal
 
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
-    h = Shape(forward_model=fwm, viewpoint=[(1.5 * np.sqrt(2.), -1.5 * np.sqrt(2.), 1.5)],
+    h = Shape(forward_model=fwm, viewpoint=[(np.sqrt(2.0), -np.sqrt(2.0), 2.0)],
               params={'LL_VARIANCE': 0.0001})
 
     """
@@ -343,16 +343,29 @@ if __name__ == "__main__":
              'shape_change_part_size_local': shape_change_part_size_local,
              'change_viewpoint': i3d_proposal.change_viewpoint}
 
-    params = {'MOVE_PART_VARIANCE': 0.0001,
-              'MOVE_OBJECT_VARIANCE': 0.0001,
-              'CHANGE_SIZE_VARIANCE': 0.0001,
-              'CHANGE_VIEWPOINT_VARIANCE': 50.0}
+    params = {'MOVE_PART_VARIANCE': 0.00005,
+              'MOVE_OBJECT_VARIANCE': 0.00005,
+              'CHANGE_SIZE_VARIANCE': 0.00005,
+              'CHANGE_VIEWPOINT_VARIANCE': 30.0}
 
     proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
 
     data = np.load('data/test1_single_view.npy')
 
-    sampler = mcmclib.mh_sampler.MHSampler(h, data, proposal, burn_in=1000, sample_count=10, best_sample_count=10,
-                                           thinning_period=2000, report_period=2000)
+    # choose sampler
+    thinning_period = 2000
+    sampler_class = 'mh'
+    if sampler_class == 'mh':
+        import mcmclib.mh_sampler
+        sampler = mcmclib.mh_sampler.MHSampler(h, data, proposal, burn_in=1000, sample_count=10, best_sample_count=10,
+                                               thinning_period=thinning_period, report_period=thinning_period)
+    elif sampler_class == 'pt':
+        from mcmclib.parallel_tempering_sampler import ParallelTemperingSampler
+        sampler = ParallelTemperingSampler(initial_hs=[h, h, h], data=data, proposals=[proposal, proposal, proposal],
+                                           temperatures=[3.0, 1.5, 1.0], burn_in=1000, sample_count=10,
+                                           best_sample_count=10, thinning_period=int(thinning_period / 3.0),
+                                           report_period=int(thinning_period / 3.0))
+    else:
+        raise ValueError('Unknown sampler class')
 
     run = sampler.sample()

@@ -18,6 +18,7 @@ import unittest
 from Infer3DShape.vision_forward_model import *
 from Infer3DShape.shape import Shape, CuboidPrimitive
 
+
 class VisionForwardModelTest(unittest.TestCase):
     def test_render(self):
         fwm = VisionForwardModel(render_size=(200, 200),

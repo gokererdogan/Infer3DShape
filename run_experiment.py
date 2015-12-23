@@ -14,6 +14,7 @@ import gmllib.experiment as exp
 import os
 import warnings
 
+
 def run_chain(**kwargs):
     """This method runs the chain with the given parameters, saves the results and returns a summary of the results.
 
@@ -24,6 +25,7 @@ def run_chain(**kwargs):
         results_folder:
         data_folder:
         hypothesis_class:
+        sampler:
         single_view:
         render_size:
         max_part_count:
@@ -40,6 +42,7 @@ def run_chain(**kwargs):
         best_sample_count:
         thinning_period:
         report_period:
+        temperatures:
 
     Returns:
         dictionary of run results
@@ -49,6 +52,7 @@ def run_chain(**kwargs):
         results_folder = kwargs['results_folder']
         data_folder = kwargs['data_folder']
         hypothesis_class = kwargs['hypothesis_class']
+        sampler = kwargs['sampler']
         single_view = kwargs['single_view']
         render_size = kwargs['render_size']
         max_part_count = kwargs['max_part_count']
@@ -65,11 +69,13 @@ def run_chain(**kwargs):
         best_sample_count = kwargs['best_sample_count']
         thinning_period = kwargs['thinning_period']
         report_period = kwargs['report_period']
+        if sampler == 'pt':
+            temperatures = kwargs['temperatures']
+            chain_count = len(temperatures)
     except KeyError as e:
         raise ValueError("All experiment parameters should be provided. Missing parameter {0:s}".format(e.message))
 
     import time
-    import mcmclib.mh_sampler as mcmc
     import mcmclib.proposal as proposal
     import vision_forward_model as vfm
     import numpy as np
@@ -139,9 +145,21 @@ def run_chain(**kwargs):
         s = "_single_view"
     data = np.load("{0:s}/{1:s}{2:s}.npy".format(data_folder, input_file, s))
 
-    sampler = mcmc.MHSampler(initial_h=h, data=data, proposal=kernel, burn_in=burn_in, sample_count=sample_count,
-                             best_sample_count=best_sample_count, thinning_period=thinning_period,
-                             report_period=report_period)
+    if sampler == 'mh':
+        from mcmclib.mh_sampler import MHSampler
+        sampler = MHSampler(initial_h=h, data=data, proposal=kernel, burn_in=burn_in, sample_count=sample_count,
+                            best_sample_count=best_sample_count, thinning_period=thinning_period,
+                            report_period=report_period)
+    elif sampler == 'pt':
+        from mcmclib.parallel_tempering_sampler import ParallelTemperingSampler
+        sampler = ParallelTemperingSampler(initial_hs=[h]*chain_count, data=data, proposals=[kernel]*chain_count,
+                                           temperatures=temperatures, burn_in=burn_in, sample_count=sample_count,
+                                           best_sample_count=best_sample_count,
+                                           thinning_period=int(thinning_period / chain_count),
+                                           report_period=int(report_period / chain_count))
+    else:
+        raise ValueError('Unknown sampler. Possible choices are mh and pt.')
+
     start = time.time()
     run = sampler.sample()
     end = time.time()
@@ -195,14 +213,14 @@ if __name__ == "__main__":
     LL_VARIANCE = 0.0001  # in squared pixel distance
     MAX_PIXEL_VALUE = 175.0  # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
     LL_FILTER_SIGMA = 2.0
-    MOVE_PART_VARIANCE = 0.0001
-    MOVE_OBJECT_VARIANCE = 0.0001
-    CHANGE_SIZE_VARIANCE = 0.0001
-    CHANGE_VIEWPOINT_VARIANCE = 50.0
+    MOVE_PART_VARIANCE = 0.00005
+    MOVE_OBJECT_VARIANCE = 0.00005
+    CHANGE_SIZE_VARIANCE = 0.00005
+    CHANGE_VIEWPOINT_VARIANCE = 30.0
 
     experiment = exp.Experiment(name="TestObjectsNoBug", experiment_method=run_chain, single_view=True,
                                 hypothesis_class=['Shape', 'ShapeMaxN', 'BDAoOSSShape'],
-                                input_file=['test2', 'test3'],
+                                sampler='pt', input_file=['test1', 'test2', 'test3'],
                                 results_folder='./results',
                                 data_folder='./data', render_size=(200, 200),
                                 max_part_count=10, max_depth=10,
@@ -213,9 +231,9 @@ if __name__ == "__main__":
                                 move_part_variance=MOVE_PART_VARIANCE,
                                 move_object_variance=MOVE_OBJECT_VARIANCE,
                                 burn_in=0, sample_count=10, best_sample_count=20, thinning_period=20000,
-                                report_period=10000)
+                                report_period=10000, temperatures=[3.0, 1.5, 1.0])
 
-    experiment.run(parallel=True, num_processes=6)
+    experiment.run(parallel=True, num_processes=9)
 
     print(experiment.results)
     experiment.save('./results')

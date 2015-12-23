@@ -15,6 +15,7 @@ import unittest
 
 from Infer3DShape.run_experiment import *
 
+
 class RunExperimentTest(unittest.TestCase):
     def test_run_experiment(self):
         # test:
@@ -27,7 +28,7 @@ class RunExperimentTest(unittest.TestCase):
         self.assertRaises(ValueError, run_chain)
         params = {'input_file': 'test1', 'results_folder': '.', 'data_folder': '../data', 'hypothesis_class': 'XXX',
                   'single_view': True, 'render_size': (200, 200), 'max_part_count': 10, 'max_depth': 10,
-                  'add_part_prob': 0.6, 'll_variance': 1.0,
+                  'add_part_prob': 0.6, 'll_variance': 1.0, 'sampler': 'mh',
                   'max_pixel_value': 175.0, 'change_size_variance': 0.1, 'change_viewpoint_variance': 0.1,
                   'move_part_variance': 0.1, 'move_object_variance': 0.1, 'burn_in': 0, 'sample_count': 1,
                   'best_sample_count': 1, 'thinning_period': 10, 'report_period': 10}
@@ -35,7 +36,12 @@ class RunExperimentTest(unittest.TestCase):
         # wrong hypothesis class
         self.assertRaises(ValueError, run_chain, kwargs=params)
 
+        # need to supply temperatures if sampler is pt
+        params['sampler'] = 'pt'
+        self.assertRaises(ValueError, run_chain, kwargs=params)
+
         params['hypothesis_class'] = 'Shape'
+        params['temperatures'] = [2.0, 1.0]
         results = run_chain(**params)
         self.assertIn('run_id', results.keys())
         self.assertIn('run_file', results.keys())

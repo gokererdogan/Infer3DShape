@@ -31,6 +31,7 @@ WIDTH_X = .75
 WIDTH_Y = .75
 WIDTH_Z = .75
 
+
 class Voxel(object):
     def __init__(self, origin, depth, status, subvoxels=None):
         self.origin = origin
@@ -148,6 +149,7 @@ class Voxel(object):
 
         return True
 
+
 class VoxelBasedShape(I3DHypothesis):
     """VoxelBasedShape class defines a 3D object by splitting the 3D space into voxels and
     representing an object as a list of occupied voxels.
@@ -192,6 +194,7 @@ class VoxelBasedShape(I3DHypothesis):
 
     def __eq__(self, comp):
         return self.voxel == comp.voxel
+
 
 # PROPOSAL FUNCTIONS
 def voxel_based_shape_flip_voxel(self, h):
