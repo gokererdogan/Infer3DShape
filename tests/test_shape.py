@@ -140,9 +140,11 @@ class ShapeTest(unittest.TestCase):
         size1 = [0.2, 0.3, 0.4]
         size2 = [0.2, 0.3, 0.1]
         part1 = CuboidPrimitive(pos1, size1)
+        part1_c = CuboidPrimitive(pos1, size1)
         part2 = CuboidPrimitive(pos2, size2)
+        part2_c = CuboidPrimitive(pos2, size2)
         s1 = Shape(forward_model=['old'], parts=[part1, part2], viewpoint=[(1.0, 1.0, 1.0)], params={'x': 1.0})
-        s2 = Shape(forward_model=['old'], parts=[part2, part1], viewpoint=[(1.0, 1.0, 1.0)], params={'x': 1.0})
+        s2 = Shape(forward_model=['old'], parts=[part2_c, part1_c], viewpoint=[(1.0, 1.0, 1.0)], params={'x': 1.0})
         self.assertEqual(s1, s2)
         s1.forward_model = None
         self.assertEqual(s1, s2)
