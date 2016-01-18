@@ -31,7 +31,7 @@ class RunExperimentTest(unittest.TestCase):
                   'add_part_prob': 0.6, 'll_variance': 1.0, 'sampler': 'mh',
                   'max_pixel_value': 175.0, 'change_size_variance': 0.1, 'change_viewpoint_variance': 0.1,
                   'move_part_variance': 0.1, 'move_object_variance': 0.1, 'burn_in': 0, 'sample_count': 1,
-                  'best_sample_count': 1, 'thinning_period': 10, 'report_period': 10}
+                  'best_sample_count': 1, 'thinning_period': 10, 'report_period': 10, 'scale_space_variance': 0.1}
 
         # wrong hypothesis class
         self.assertRaises(ValueError, run_chain, kwargs=params)

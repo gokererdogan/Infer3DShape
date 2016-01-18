@@ -25,6 +25,11 @@ class VoxelBasedShapeTestHypothesis(VoxelBasedShapeMaxD):
     def _calculate_log_likelihood(self, data=None):
         return 0.0
 
+    def _calculate_log_prior(self):
+        p = self.voxel.count_voxels_by_status(PARTIAL_VOXEL) - 1
+        v = self.voxel.voxels_per_axis**3
+        return -np.log(count_trees(partial_count=p, max_voxels=v, max_depth=self.max_depth))
+
     def copy(self):
         voxel_copy = self.voxel.copy()
         self_copy = VoxelBasedShapeTestHypothesis(voxel=voxel_copy, max_depth=self.max_depth)
@@ -70,7 +75,7 @@ class VoxelBasedShapeTest(unittest.TestCase):
                 raise AssertionError("Item {0:s} cannot be found in list {1:s}".format(i1, l2))
 
     def create_test_voxel1(self):
-        h = Voxel.get_random_voxel(origin=[0.0, 0.0, 0.0], depth=0)
+        h = Voxel.get_random_voxel(origin=[0.0, 0.0, 0.0], depth=0, voxels_per_axis=2, size=(1.5, 1.5, 1.5))
         for x in range(2):
             for y in range(2):
                 for z in range(2):
@@ -78,7 +83,7 @@ class VoxelBasedShapeTest(unittest.TestCase):
         return h
 
     def create_test_voxel2(self):
-        h = Voxel.get_random_voxel(origin=[0.0, 0.0, 0.0], depth=0)
+        h = Voxel.get_random_voxel(origin=[0.0, 0.0, 0.0], depth=0, voxels_per_axis=2, size=(1.5, 1.5, 1.5))
         for x in range(2):
             for y in range(2):
                 for z in range(2):
@@ -88,13 +93,13 @@ class VoxelBasedShapeTest(unittest.TestCase):
         return h
 
     def create_test_voxel3(self):
-        h = Voxel.get_random_voxel(origin=[0.0, 0.0, 0.0], depth=0)
+        h = Voxel.get_random_voxel(origin=[0.0, 0.0, 0.0], depth=0, voxels_per_axis=2, size=(1.5, 1.5, 1.5))
         for x in range(2):
             for y in range(2):
                 for z in range(2):
                     h.subvoxels[x, y, z].status = EMPTY_VOXEL
         h.subvoxels[1, 1, 1].status = FULL_VOXEL
-        sv = Voxel.get_random_voxel(h.subvoxels[0, 0, 0].origin, 1)
+        sv = Voxel.get_random_voxel(h.subvoxels[0, 0, 0].origin, 1, voxels_per_axis=2)
         for x in range(2):
             for y in range(2):
                 for z in range(2):
@@ -123,7 +128,7 @@ class VoxelBasedShapeTest(unittest.TestCase):
         # assumes the whole space is [-0.75, 0.75] x [-0.75, 0.75] x [-0.75, 0.75]
         # assumes 2 voxels per axis
         voxel_xyz = [-0.375, 0.375]
-        sv = Voxel.get_random_subvoxels([0.0, 0.0, 0.0], 0)
+        sv = Voxel.get_random_subvoxels([0.0, 0.0, 0.0], 0, voxels_per_axis=2, size=(1.5, 1.5, 1.5))
         for x in range(2):
             for y in range(2):
                 for z in range(2):
@@ -221,10 +226,10 @@ class VoxelBasedShapeTest(unittest.TestCase):
         self.assertNotEqual(copy.subvoxels[0, 0, 0], self.v3.subvoxels[0, 0, 0])
 
     def test_voxel_eq(self):
-        v = Voxel.get_random_voxel([0.0, 0.0, 0.0], 0)
-        for x in range(VOXELS_PER_AXIS):
-            for y in range(VOXELS_PER_AXIS):
-                for z in range(VOXELS_PER_AXIS):
+        v = Voxel.get_random_voxel([0.0, 0.0, 0.0], 0, voxels_per_axis=2, size=(1.5, 1.5, 1.5))
+        for x in range(2):
+            for y in range(2):
+                for z in range(2):
                     v.subvoxels[x, y, z].status = EMPTY_VOXEL
 
         self.assertEqual(self.v1, v)
@@ -248,7 +253,7 @@ class VoxelBasedShapeTest(unittest.TestCase):
         self.s1.voxel.subvoxels[0, 0, 0] = Voxel.get_random_voxel(self.s1.voxel.subvoxels[0, 0, 0].origin, 1)
         self.s1.update_depth()
         self.assertEqual(self.s1.depth, 2)
-        self.assertAlmostEqual(self.s1.log_prior(), -np.log(262144.0) - 2 * np.log(2.0))
+        self.assertAlmostEqual(self.s1.log_prior(), -np.log(262144.0) - (2 * np.log(2.0)))
 
         self.assertEqual(self.s2.depth, 1)
         self.assertAlmostEqual(self.s2.log_prior(), -np.log(256.0) - np.log(2.0))
@@ -269,37 +274,45 @@ class VoxelBasedShapeTest(unittest.TestCase):
 
         s = VoxelBasedShapeMaxD(forward_model=None, voxel=self.v1, max_depth=2)
         self.assertEqual(s.depth, 1)
-        self.assertAlmostEqual(s.log_prior(), -np.log(256.0))
+        self.assertAlmostEqual(s.log_prior(), -np.log(2232) - np.log(2.0))
         s.voxel.subvoxels[0, 0, 0] = Voxel.get_random_voxel(s.voxel.subvoxels[0, 0, 0].origin, 1)
         s.update_depth()
         self.assertEqual(s.depth, 2)
-        self.assertAlmostEqual(s.log_prior(), -np.log(262144.0))
+        self.assertAlmostEqual(s.log_prior(), -(2 * np.log(2232)) - (2 * np.log(2.0)))
 
         s = VoxelBasedShapeMaxD(forward_model=None, voxel=self.v2, max_depth=2)
         self.assertEqual(s.depth, 1)
-        self.assertAlmostEqual(s.log_prior(), -np.log(256.0))
+        self.assertAlmostEqual(s.log_prior(), -(1 * np.log(2232)) - (1 * np.log(2.0)))
         s.voxel.subvoxels[0, 0, 0] = Voxel.get_random_voxel(s.voxel.subvoxels[0, 0, 0].origin, 1)
         s.update_depth()
         self.assertEqual(s.depth, 2)
-        self.assertAlmostEqual(s.log_prior(), -np.log(262144.0))
+        self.assertAlmostEqual(s.log_prior(), -(2 * np.log(2232)) - (2 * np.log(2.0)))
 
         s = VoxelBasedShapeMaxD(forward_model=None, voxel=self.v3, max_depth=2)
         self.assertEqual(s.depth, 2)
-        self.assertAlmostEqual(s.log_prior(), -np.log(262144.0))
+        self.assertAlmostEqual(s.log_prior(), -(2 * np.log(2232)) - (2 * np.log(2.0)))
         s.voxel.subvoxels[0, 0, 1] = Voxel.get_random_voxel(s.voxel.subvoxels[0, 0, 1].origin, 1)
         s.update_depth()
         self.assertEqual(s.depth, 2)
-        self.assertAlmostEqual(s.log_prior(), -np.log(117440512.0))
+        self.assertAlmostEqual(s.log_prior(), -(3 * np.log(2232)) - (3 * np.log(2.0)))
 
     def test_voxel_based_shape_copy(self):
-        # voxel.copy is already tested above. just test viewpoint copying.
+        # voxel.copy is already tested above. just test viewpoint, scale and origin copying.
         self.s3.viewpoint = [np.array([0.0, 0.0, 0.0])]
+        self.s3.origin = np.array([0.0, 0.0, 0.0])
+        self.s3.scale = np.array([1.0, 1.0, 1.0])
         copy = self.s3.copy()
         self.assertNumpyArrayListEqual(self.s3.viewpoint, copy.viewpoint)
+        self.assertNumpyArrayEqual(self.s3.origin, copy.origin)
+        self.assertNumpyArrayEqual(self.s3.scale, copy.scale)
         copy.viewpoint[0][0] = -1.0
         self.assertNumpyArrayNotEqual(self.s3.viewpoint[0], copy.viewpoint[0])
-
+        copy.origin[0] = -1.0
+        self.assertNumpyArrayNotEqual(self.s3.origin, copy.origin)
+        copy.scale[0] = 2.0
+        self.assertNumpyArrayNotEqual(self.s3.scale, copy.scale)
         self.assertEqual(self.s3.voxel, copy.voxel)
+        self.assertNotEqual(self.s3, copy)
 
     def test_voxel_flip_full_vs_empty(self):
         # only empty to full possible
@@ -478,6 +491,16 @@ class VoxelBasedShapeTest(unittest.TestCase):
         # check depth limit
         params = {'MAX_DEPTH': 1}
         self.assertRaises(ValueError, voxel_based_shape_flip_empty_vs_partial, self.s3, params)
+
+    def test_voxel_scale_space(self):
+        hp, q_hp_h, q_h_hp = voxel_scale_space(self.s1, {'SCALE_SPACE_VARIANCE': .01})
+        self.assertAlmostEqual(q_h_hp, 1.0)
+        self.assertAlmostEqual(q_hp_h, 1.0)
+        self.assertTrue(np.all(hp.scale > 0.0))
+        if np.all(hp.scale == self.s1.scale):  # if updated scale was out out bounds
+            self.assertEqual(hp, self.s1)
+        else:
+            self.assertNotEqual(hp, self.s1)
 
     def test_voxel_sample_prior(self):
         # test if sampling from the prior produces a set of samples with expected frequency statistics.

@@ -14,6 +14,7 @@ from copy import deepcopy
 import BDAoOSS.bdaooss_grammar as bdaooss
 import i3d_hypothesis as hyp
 
+
 class BDAoOSSShape(hyp.I3DHypothesis):
     """
     This class implements a shape grammar hypothesis based on the true grammar for
@@ -93,6 +94,9 @@ class BDAoOSSShape(hyp.I3DHypothesis):
             matched_parts.append(i)
 
         return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __getstate__(self):
         # we cannot pickle VTKObjects, so get rid of them.
@@ -319,11 +323,12 @@ if __name__ == "__main__":
 
     proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
 
-    data = np.load('data/test1_single_view.npy')
+    # data = np.load('data/test1_single_view.npy')
+    data = np.load('data/stimuli20150624_144833/o1_single_view.npy')
 
     # choose sampler
     thinning_period = 2000
-    sampler_class = 'pt'
+    sampler_class = 'mh'
     if sampler_class == 'mh':
         import mcmclib.mh_sampler
         sampler = mcmclib.mh_sampler.MHSampler(h, data, proposal, burn_in=1000, sample_count=10, best_sample_count=10,

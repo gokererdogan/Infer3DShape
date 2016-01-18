@@ -19,6 +19,7 @@ import Infer3DShape.i3d_hypothesis as hyp
 # probability of adding a new part used when generating objects randomly
 ADD_PART_PROB = 0.6
 
+
 class CuboidPrimitive(object):
     """
     CuboidPrimitive class defines a 3D rectangular prism used as a primitive
@@ -60,6 +61,9 @@ class CuboidPrimitive(object):
         if np.sum(np.abs(self.position - comp.position)) < 1e-6 and np.sum(np.abs(self.size - comp.size)) < 1e-6:
             return True
         return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __sub__(self, other):
         return np.sum(np.abs(self.position - other.position)) + np.sum(np.abs(self.size - other.size))
@@ -172,6 +176,9 @@ class Shape(hyp.I3DHypothesis):
             matched_parts.append(i)
 
         return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def distance(self, other):
         dist = 0.0

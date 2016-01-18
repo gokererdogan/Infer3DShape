@@ -18,6 +18,7 @@ from shape_maxn import *
 import vision_forward_model as vfm
 from mcmclib.mcmc_run import MCMCRun
 
+
 def calculate_prob(data, samples, log_probs, integrate_over_viewpoint=False, use_only_MAP=False):
     """Calculate probability of observing data from samples with given probs.
 
@@ -56,6 +57,7 @@ def calculate_prob(data, samples, log_probs, integrate_over_viewpoint=False, use
             sim_mean += (prob * ll_mean)
             sim_max += (prob * ll_max)
         return sim_mean, sim_max
+
 
 def _prob_image_given_hypothesis(image, hypothesis, integrate_over_viewpoint=False):
     """Calculate probability of image given hypothesis, p(I|H). We can integrate over viewpoint

@@ -9,6 +9,7 @@ Goker Erdogan
 https://github.com/gokererdogan/
 """
 from shape import *
+from voxel_based_shape import VoxelBasedShape, Voxel, EMPTY_VOXEL, FULL_VOXEL
 
 
 def get_viewpoint(angle):
@@ -58,3 +59,76 @@ if __name__ == "__main__":
     img = fwm.render(h)
     np.save('./data/test3_single_view.npy', img)
     fwm.save_render('./data/test3_single_view.png', h)
+
+
+    # test 4
+    viewpoint = get_viewpoint(49)
+    v = VoxelBasedShape(fwm, viewpoint=viewpoint)
+    for vx in v.voxel.subvoxels:
+        for vy in vx:
+            for vz in vy:
+                vz.status = EMPTY_VOXEL
+
+    v.voxel.subvoxels[0, 0, 0] = Voxel.get_random_voxel(v.voxel.subvoxels[0, 0, 0].origin,
+                                                        v.voxel.subvoxels[0, 0, 0].depth)
+    for vx in v.voxel.subvoxels[0, 0, 0].subvoxels:
+        for vy in vx:
+            for vz in vy:
+                vz.status = EMPTY_VOXEL
+    v.voxel.subvoxels[0, 0, 0].subvoxels[0, 1, 0].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 0, 0].subvoxels[1, 1, 0].status = FULL_VOXEL
+
+    v.voxel.subvoxels[0, 1, 0] = Voxel.get_random_voxel(v.voxel.subvoxels[0, 1, 0].origin,
+                                                        v.voxel.subvoxels[0, 1, 0].depth)
+    for vx in v.voxel.subvoxels[0, 1, 0].subvoxels:
+        for vy in vx:
+            for vz in vy:
+                vz.status = EMPTY_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[0, 0, 0].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[0, 1, 0].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[1, 0, 1].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[1, 1, 0].status = FULL_VOXEL
+    img = fwm.render(v)
+    np.save('./data/test4_single_view.npy', img)
+    fwm.save_render('./data/test4_single_view.png', v)
+
+    # test 5
+    viewpoint = get_viewpoint(349)
+    v = VoxelBasedShape(fwm, viewpoint=viewpoint)
+    for vx in v.voxel.subvoxels:
+        for vy in vx:
+            for vz in vy:
+                vz.status = EMPTY_VOXEL
+
+    v.voxel.subvoxels[0, 0, 0] = Voxel.get_random_voxel(v.voxel.subvoxels[0, 0, 0].origin,
+                                                        v.voxel.subvoxels[0, 0, 0].depth)
+    for vx in v.voxel.subvoxels[0, 0, 0].subvoxels:
+        for vy in vx:
+            for vz in vy:
+                vz.status = EMPTY_VOXEL
+    v.voxel.subvoxels[0, 0, 0].subvoxels[0, 1, 0].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 0, 0].subvoxels[1, 1, 0].status = FULL_VOXEL
+
+    v.voxel.subvoxels[0, 1, 0] = Voxel.get_random_voxel(v.voxel.subvoxels[0, 1, 0].origin,
+                                                        v.voxel.subvoxels[0, 1, 0].depth)
+    for vx in v.voxel.subvoxels[0, 1, 0].subvoxels:
+        for vy in vx:
+            for vz in vy:
+                vz.status = EMPTY_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[0, 0, 0].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[0, 1, 0].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[1, 0, 1].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[1, 1, 0] = Voxel.get_random_voxel(v.voxel.subvoxels[0, 1, 0].subvoxels[1, 1, 0].origin,
+                                                                           v.voxel.subvoxels[0, 1, 0].subvoxels[1, 1, 0].depth)
+    for vx in v.voxel.subvoxels[0, 1, 0].subvoxels[1, 1, 0].subvoxels:
+        for vy in vx:
+            for vz in vy:
+                vz.status = EMPTY_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[1, 1, 0].subvoxels[0, 1, 1].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[1, 1, 0].subvoxels[1, 1, 0].status = FULL_VOXEL
+    v.voxel.subvoxels[0, 1, 0].subvoxels[1, 1, 0].subvoxels[1, 0, 1].status = FULL_VOXEL
+
+    img = fwm.render(v)
+    np.save('./data/test5_single_view.npy', img)
+    fwm.save_render('./data/test5_single_view.png', v)
+

@@ -14,6 +14,7 @@ https://github.com/gokererdogan/
 
 from shape import *
 
+
 class ShapeMaxN(Shape):
     """
     ShapeMaxN class defines a 3D object with maximum N parts.
@@ -91,7 +92,8 @@ if __name__ == "__main__":
 
     proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
 
-    data = np.load('data/test1_single_view.npy')
+    # data = np.load('data/test1_single_view.npy')
+    data = np.load('data/stimuli20150624_144833/o1_single_view.npy')
 
     # choose sampler
     thinning_period = 2000

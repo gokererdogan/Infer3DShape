@@ -18,3 +18,23 @@ refactored; most of it is quite messy now.
 serialization functionality. A simple idea is to simply store the positions and sizes of each part, viewpoint, and
 maybe params for each hypothesis. This should work for all the hypothesis in this package.
 - test calculate_similarity
+- viewpoint and camera position is confounded now. if viewpoint is available, camera_pos setting in 
+vision_forward_model is ignored. but this is confusing. viewpoint refers to the rotation of the object around z axis. 
+camera_pos is the set of positions of the camera. One should be able to change these independently. Let viewpoint and 
+camera_position be both rotation angles (position in spherical coordinates). when rendering, add the viewpoint and
+camera_pos angles together. If no viewpoint, assume 0 rotation for object.
+- Don't change object internal stuff from the outside. Most proposal functions do that. The class should take care 
+of its internal stuff itself. Changing from the outside makes it harder to control consistency of the internal 
+information. For example, proposal functions add/remove voxels directly by accessing internal stuff; this could 
+lead to cases where hypothesis depth is out of sync. The best way is to let objects take care of their internals
+themselves. This is also important because we assume hypotheses don't change; prior and likelihood is calculated
+only once. Therefore, if we make any changes in hypothesis, we force a recalculation of these. This is ugly and
+potentially dangerous. The solution is to make sure that all the info you need is already final before you create
+a hypothesis. Your proposal functions should create all the internal info first and then create the 
+hypothesis using these.
+- ~~add resize voxel move to voxel based shape. that should enable the coarsest level to settle down on the extent of the
+object, hopefully enabling faster convergence.~~
+- do not find the list of partial, full, empty voxels from scratch each time. keep a list of these at the highest level 
+and update these as we add/remove/change voxels.
+- write tests for voxel_based_shape scale and origin.
+- write tests for voxel count_trees

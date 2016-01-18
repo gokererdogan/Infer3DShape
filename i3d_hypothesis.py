@@ -21,6 +21,7 @@ MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the l
 # sigma for the Gaussian filter used in likelihood_pixel_gaussian_filtered
 LL_FILTER_SIGMA = 2.0
 
+
 class I3DHypothesis(hyp.Hypothesis):
     """Base hypothesis class for hypotheses in Infer3DShape package.
 

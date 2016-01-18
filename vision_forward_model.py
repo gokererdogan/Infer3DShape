@@ -17,7 +17,11 @@ import scipy.misc
 from gmllib.helpers import rgb2gray
 
 # canonical view +- 45 degrees
-DEFAULT_CAMERA_POS = [(np.sqrt(2.0), -np.sqrt(2.0), 2.0)]
+DEFAULT_CAMERA_POS = [(2.0 * np.cos(0.0), 2.0 * np.sin(0.0), 2.0),
+                      (2.0 * np.cos(np.pi / 4.0), 2.0 * np.sin(np.pi / 4.0), 2.0),
+                      (2.0 * np.cos(np.pi / 2.0), 2.0 * np.sin(np.pi / 2.0), 2.0),
+                      (2.0 * np.cos(3 * np.pi / 4.0), 2.0 * np.sin(3 * np.pi / 4.0), 2.0),
+                      (2.0 * np.cos(np.pi), 2.0 * np.sin(np.pi), 2.0)]
 DEFAULT_RENDER_SIZE = (200, 200)
 DEFAULT_CAMERA_UP = (0, 0, 1)
 
@@ -75,7 +79,7 @@ class VisionForwardModel:
         self.vtkrenderer.AddLight(self.light3)
         self.vtkrenderer.AddLight(self.light4)
 
-        self.vtkrenderer.SetBackground(0.0, 0.0, 0.0) # Background color
+        self.vtkrenderer.SetBackground(0.0, 0.0, 0.0)  # Background color
 
         self.vtkrender_window = vtk.vtkRenderWindow()
         self.vtkrender_window.AddRenderer(self.vtkrenderer)
@@ -87,7 +91,7 @@ class VisionForwardModel:
         # HOWEVER, you won't be able to use view etc. methods to look at and interact with
         # the object. You must render the object and use matplotlib etc. to view the
         # rendered image.
-        self.vtkrender_window.SetOffScreenRendering(1)
+        # self.vtkrender_window.SetOffScreenRendering(1)
 
         # these below lines are here with the hope of fixing a problem with off-screen rendering.
         # the quality of the offscreen render seems inferior.
@@ -98,19 +102,14 @@ class VisionForwardModel:
         # 2) it might be that offscreen rendering uses software rendering, no hardware
         # acceleration. I don't know how one can check that.
         # still, the quality of the renders are good enough for our purposes
-        self.vtkrender_window.SetLineSmoothing(1)
-        self.vtkrender_window.SetMultiSamples(8)
+        # self.vtkrender_window.SetLineSmoothing(1)
+        # self.vtkrender_window.SetMultiSamples(8)
 
         # vtk objects for reading, and rendering object parts
         self.part_source = vtk.vtkCubeSource()
         self.part_output = self.part_source.GetOutput()
         self.part_mapper = vtk.vtkPolyDataMapper()
         self.part_mapper.SetInput(self.part_output)
-
-        # exporters
-        self.vtkvrml_exporter = vtk.vtkVRMLExporter()
-        self.vtkobj_exporter = vtk.vtkOBJExporter()
-        self.stl_writer = vtk.vtkSTLWriter()
 
     def _reset_camera(self):
         """
@@ -185,35 +184,6 @@ class VisionForwardModel:
         self.vtkrender_window.Render()
         self.vtkrender_window_interactor.Start()
 
-    def _save_wrl(self, filename, shape):
-        """
-        Save object to wrl file.
-        """
-        self._build_scene(shape)
-        self.vtkrender_window.Render()
-        self.vtkvrml_exporter.SetInput(self.vtkrender_window)
-        self.vtkvrml_exporter.SetFileName(filename)
-        self.vtkvrml_exporter.Write()
-    
-    def _save_obj(self, filename, shape):
-        """
-        Save object to obj file.
-        """
-        self._build_scene(shape)
-        self.vtkrender_window.Render()
-        self.vtkobj_exporter.SetInput(self.vtkrender_window)
-        self.vtkobj_exporter.SetFilePrefix(filename)
-        self.vtkobj_exporter.Write()
-
-    def _save_stl(self, filename, shape):
-        """
-        Save object to stl file.
-        """
-        return NotImplementedError()
-        # TO-DO
-        # we can't save the whole scene to a single STL file,
-        # we need to figure out how to get around that.
-        
     def save_render(self, filename, shape):
         """
         Save rendered image to disk.

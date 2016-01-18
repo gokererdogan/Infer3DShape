@@ -37,6 +37,7 @@ def run_chain(**kwargs):
         change_viewpoint_variance:
         move_part_variance:
         move_object_variance:
+        scale_space_variance:
         burn_in:
         sample_count:
         best_sample_count:
@@ -64,6 +65,7 @@ def run_chain(**kwargs):
         change_viewpoint_variance = kwargs['change_viewpoint_variance']
         move_part_variance = kwargs['move_part_variance']
         move_object_variance = kwargs['move_object_variance']
+        scale_space_variance = kwargs['scale_space_variance']
         burn_in = kwargs['burn_in']
         sample_count = kwargs['sample_count']
         best_sample_count = kwargs['best_sample_count']
@@ -83,7 +85,9 @@ def run_chain(**kwargs):
 
     shape_params = {'ADD_PART_PROB': add_part_prob, 'LL_VARIANCE': ll_variance, 'MAX_PIXEL_VALUE': max_pixel_value}
     kernel_params = {'CHANGE_SIZE_VARIANCE': change_size_variance, 'MOVE_PART_VARIANCE': move_part_variance,
-                     'MOVE_OBJECT_VARIANCE': move_object_variance, 'CHANGE_VIEWPOINT_VARIANCE': change_viewpoint_variance}
+                     'MOVE_OBJECT_VARIANCE': move_object_variance,
+                     'CHANGE_VIEWPOINT_VARIANCE': change_viewpoint_variance,
+                     'SCALE_SPACE_VARIANCE': scale_space_variance}
 
     moves = {}
     if single_view:
@@ -134,6 +138,23 @@ def run_chain(**kwargs):
         moves['bdaooss_change_part_size_local'] = bdaooss.bdaooss_change_part_size_local
         moves['bdaooss_change_part_dock_face'] = bdaooss.bdaooss_change_part_dock_face
         # moves['bdaooss_move_object'] = bdaooss.bdaooss_move_object
+        kernel_params['MAX_DEPTH'] = max_depth
+        kernel = proposal.RandomMixtureProposal(moves=moves, params=kernel_params)
+    elif hypothesis_class == 'VoxelBasedShape':
+        import voxel_based_shape as vox
+        h = vox.VoxelBasedShape(forward_model=fwm, viewpoint=viewpoint, params=shape_params)
+        moves['voxel_flip_full_vs_empty'] = vox.voxel_based_shape_flip_full_vs_empty
+        moves['voxel_flip_partial_vs_full'] = vox.voxel_based_shape_flip_full_vs_partial
+        moves['voxel_flip_partial_vs_empty'] = vox.voxel_based_shape_flip_empty_vs_partial
+        moves['voxel_scale_space'] = vox.voxel_scale_space
+        kernel = proposal.RandomMixtureProposal(moves=moves, params=kernel_params)
+    elif hypothesis_class == 'VoxelBasedShapeMaxD':
+        import voxel_based_shape as vox
+        h = vox.VoxelBasedShapeMaxD(forward_model=fwm, viewpoint=viewpoint, params=shape_params, max_depth=max_depth)
+        moves['voxel_flip_full_vs_empty'] = vox.voxel_based_shape_flip_full_vs_empty
+        moves['voxel_flip_partial_vs_full'] = vox.voxel_based_shape_flip_full_vs_partial
+        moves['voxel_flip_partial_vs_empty'] = vox.voxel_based_shape_flip_empty_vs_partial
+        moves['voxel_scale_space'] = vox.voxel_scale_space
         kernel_params['MAX_DEPTH'] = max_depth
         kernel = proposal.RandomMixtureProposal(moves=moves, params=kernel_params)
     else:
@@ -216,28 +237,47 @@ if __name__ == "__main__":
     MOVE_PART_VARIANCE = 0.00005
     MOVE_OBJECT_VARIANCE = 0.00005
     CHANGE_SIZE_VARIANCE = 0.00005
+    SCALE_SPACE_VARIANCE = 0.0025
     CHANGE_VIEWPOINT_VARIANCE = 30.0
 
-    experiment = exp.Experiment(name="TestObjectsNoBug", experiment_method=run_chain, single_view=True,
-                                hypothesis_class=['Shape', 'ShapeMaxN', 'BDAoOSSShape'],
-                                sampler='pt', input_file=['test1', 'test2', 'test3'],
+    experiment = exp.Experiment(name="Stimuli20150624_144833", experiment_method=run_chain,
+                                grouped_params=['ll_variance', 'change_size_variance', 'move_object_variance',
+                                                'move_part_variance', 'change_viewpoint_variance',
+                                                'scale_space_variance'],
+                                single_view=True,
+                                hypothesis_class=['BDAoOSSShape', 'Shape'],
+                                sampler='mh', input_file=['o7', 'o7_t1_cs_d1', 'o7_t1_cs_d2', 'o7_t2_ap_d1',
+                                                          'o7_t2_ap_d2', 'o7_t2_rp_d1', 'o7_t2_rp_d2', 'o7_t2_mf_d1',
+                                                          'o7_t2_mf_d2',
+                                                          'o8', 'o8_t1_cs_d1', 'o8_t1_cs_d2', 'o8_t2_ap_d1',
+                                                          'o8_t2_ap_d2', 'o8_t2_rp_d1', 'o8_t2_rp_d2', 'o8_t2_mf_d1',
+                                                          'o8_t2_mf_d2',
+                                                          'o9', 'o9_t1_cs_d1', 'o9_t1_cs_d2', 'o9_t2_ap_d1',
+                                                          'o9_t2_ap_d2', 'o9_t2_rp_d1', 'o9_t2_rp_d2', 'o9_t2_mf_d1',
+                                                          'o9_t2_mf_d2',
+                                                          'o10', 'o10_t1_cs_d1', 'o10_t1_cs_d2', 'o10_t2_ap_d1',
+                                                          'o10_t2_ap_d2', 'o10_t2_rp_d1', 'o10_t2_rp_d2', 'o10_t2_mf_d1',
+                                                          'o10_t2_mf_d2'],
                                 results_folder='./results',
-                                data_folder='./data', render_size=(200, 200),
-                                max_part_count=10, max_depth=10,
-                                add_part_prob=ADD_PART_PROB, ll_variance=LL_VARIANCE,
+                                data_folder='./data/stimuli20150624_144833/',
+                                render_size=(200, 200),
+                                max_part_count=10, max_depth=2,
+                                add_part_prob=ADD_PART_PROB,
                                 max_pixel_value=MAX_PIXEL_VALUE,
-                                change_size_variance=CHANGE_SIZE_VARIANCE,
-                                change_viewpoint_variance=CHANGE_VIEWPOINT_VARIANCE,
-                                move_part_variance=MOVE_PART_VARIANCE,
-                                move_object_variance=MOVE_OBJECT_VARIANCE,
-                                burn_in=0, sample_count=10, best_sample_count=20, thinning_period=20000,
-                                report_period=10000, temperatures=[3.0, 1.5, 1.0])
+                                ll_variance=[0.0001],
+                                change_size_variance=[0.00005],
+                                move_object_variance=[0.00005],
+                                move_part_variance=[0.00005],
+                                change_viewpoint_variance=[60.0],
+                                scale_space_variance=[0.0025],
+                                burn_in=0, sample_count=20, best_sample_count=20, thinning_period=10000,
+                                report_period=10000, temperatures=[[3.0, 1.5, 1.0]])
 
     experiment.run(parallel=True, num_processes=9)
 
     print(experiment.results)
     experiment.save('./results')
-    experiment.append_csv('./results/TestObjectsNoBug.csv')
+    experiment.append_csv('./results/Run.csv')
     
     """
     input_file=['o1', 'o1_t1_cs_d1', 'o1_t1_cs_d2',
