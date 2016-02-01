@@ -55,6 +55,9 @@ class BDAoOSSShape(hyp.I3DHypothesis):
         :return: positions and sizes
         """
         parts, positions, sizes, viewpoint = self.shape.convert_to_parts_positions()
+        # get rid of really small parts (this shouldn't happen)
+        positions = [p for p, s in zip(positions, sizes) if np.all(s>0.01)]
+        sizes = [s for s in sizes if np.all(s>0.01)]
         return positions, sizes
 
     def copy(self):
@@ -259,8 +262,8 @@ def bdaooss_change_part_size_local(h, params):
     node = np.random.choice(nodes)
     change = np.random.randn(3) * np.sqrt(params['CHANGE_SIZE_VARIANCE'])
     # if proposed size is not out of bounds ([0, 1])
-    if np.all((sm.spatial_states[node].size + change) < 1.0) \
-            and np.all((sm.spatial_states[node].size + change) > 0.0):
+    if np.all((sm.spatial_states[node].size + change) < 1.02) \
+            and np.all((sm.spatial_states[node].size + change) > 0.02):
         sm.spatial_states[node].size += change
         sm.update(hp.shape.tree, hp.shape.grammar)
 

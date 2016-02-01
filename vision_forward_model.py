@@ -91,7 +91,7 @@ class VisionForwardModel:
         # HOWEVER, you won't be able to use view etc. methods to look at and interact with
         # the object. You must render the object and use matplotlib etc. to view the
         # rendered image.
-        # self.vtkrender_window.SetOffScreenRendering(1)
+        self.vtkrender_window.SetOffScreenRendering(1)
 
         # these below lines are here with the hope of fixing a problem with off-screen rendering.
         # the quality of the offscreen render seems inferior.
@@ -102,8 +102,8 @@ class VisionForwardModel:
         # 2) it might be that offscreen rendering uses software rendering, no hardware
         # acceleration. I don't know how one can check that.
         # still, the quality of the renders are good enough for our purposes
-        # self.vtkrender_window.SetLineSmoothing(1)
-        # self.vtkrender_window.SetMultiSamples(8)
+        self.vtkrender_window.SetLineSmoothing(1)
+        self.vtkrender_window.SetMultiSamples(8)
 
         # vtk objects for reading, and rendering object parts
         self.part_source = vtk.vtkCubeSource()

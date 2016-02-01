@@ -1,10 +1,9 @@
 # Infer3DShape
 # Infers 3D shape of an object from 2D images
 #
-# This folder (nn) contains code for 
-# discriminative neural network models
-# for this problem 
+# This folder (similarity) contains code for 
+# calculating similarities using our model.
 #
 # Goker Erdogan
-# 15 Sep. 2015
+# 1 Feb. 2016
 # https://github.com/gokererdogan

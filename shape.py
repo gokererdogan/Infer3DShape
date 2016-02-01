@@ -28,7 +28,8 @@ class CuboidPrimitive(object):
 
     Attributes:
         position (3x1-ndarray): Position of primitive, sampled from ~ Unif(1.0, 1.0)
-        size (3x1-ndarray): Size of primitive, sampled from ~ Unif(0,1)
+        size (3x1-ndarray): Size of primitive, sampled from ~ Unif(0.02,1.02). We don't
+            want parts to get really small.
     """
     def __init__(self, position=None, size=None):
         if position is None:
@@ -41,10 +42,10 @@ class CuboidPrimitive(object):
 
         if size is None:
             # randomly pick size
-            size = np.random.rand(3)
+            size = np.random.rand(3) + 0.02
         else:
             size = np.array(size)
-            if np.any(size > 1.0) or np.any(size < 0.0):
+            if np.any(size > 1.02) or np.any(size < 0.02):
                 raise ValueError("Size must be in [0.0, 1.0]")
 
         self.position = position
@@ -111,6 +112,15 @@ class Shape(hyp.I3DHypothesis):
 
         return Shape(forward_model=forward_model, parts=parts, viewpoint=viewpoint, params=params)
 
+    @staticmethod
+    def from_positions_sizes(positions, sizes, forward_model, viewpoint=None, params=None):
+        parts = []
+        for pos, size in zip(positions, sizes):
+            if np.all(size>0) and np.sum(size) > 1e-6:
+                parts.append(CuboidPrimitive(position=pos, size=size))
+
+        return Shape(forward_model=forward_model, parts=parts, viewpoint=viewpoint, params=params)
+
     def _calculate_log_prior(self):
         # assumes a uniform prob. dist. over add object probability,
         # position (in [-0.5,0.5]) and size (in [0,1])
@@ -127,8 +137,9 @@ class Shape(hyp.I3DHypothesis):
         positions = []
         sizes = []
         for part in self.parts:
-            positions.append(part.position)
-            sizes.append(part.size)
+            if np.all(part.size > 0.01):
+                positions.append(part.position)
+                sizes.append(part.size)
 
         return positions, sizes
 
@@ -314,7 +325,7 @@ def shape_change_part_size(h, params):
     hp = h.copy()
     part_count = len(h.parts)
     part_id = np.random.randint(0, part_count)
-    hp.parts[part_id].size = np.random.rand(3)
+    hp.parts[part_id].size = np.random.rand(3) + 0.02
     return hp, 1.0, 1.0
 
 
@@ -324,7 +335,7 @@ def shape_change_part_size_local(h, params):
     part_id = np.random.randint(0, part_count)
     change = np.random.randn(3) * np.sqrt(params['CHANGE_SIZE_VARIANCE'])
     # if proposed size is not out of bounds ([0, 1])
-    if np.all((hp.parts[part_id].size + change) < 1.0) and np.all((hp.parts[part_id].size + change) > 0.0):
+    if np.all((hp.parts[part_id].size + change) < 1.02) and np.all((hp.parts[part_id].size + change) > 0.02):
         hp.parts[part_id].size += change
     return hp, 1.0, 1.0
 

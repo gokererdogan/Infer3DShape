@@ -36,5 +36,8 @@ hypothesis using these.
 object, hopefully enabling faster convergence.~~
 - do not find the list of partial, full, empty voxels from scratch each time. keep a list of these at the highest level 
 and update these as we add/remove/change voxels.
-- write tests for voxel_based_shape scale and origin.
+- ~~write tests for voxel_based_shape scale and origin.~~
 - write tests for voxel count_trees
+- ~~We shouldn't let part size to get really small (around 0.01 in any direction for example). Such small parts do not make
+sense. The right way to do this is by changing the prior on part sizes. Maybe we should constrain the range from below at
+0.01.~~

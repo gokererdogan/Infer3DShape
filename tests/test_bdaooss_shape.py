@@ -148,10 +148,11 @@ class BDAoOSSShapeTest(unittest.TestCase):
         self.assertNotEqual(h2_copy, self.h2)
 
     def test_bdaooss_maxd_prior(self):
+        # BDAoOSShapeMaxD has the same prior as BDAoOSShape
         h1 = BDAoOSSShapeMaxD(None, shape=self.h1.shape)
-        self.assertAlmostEqual(h1.log_prior(), np.log(1.0))
+        self.assertAlmostEqual(h1.log_prior(), np.log(1.0 / 4.0))
         h2 = BDAoOSSShapeMaxD(None, shape=self.h2.shape)
-        self.assertAlmostEqual(h2.log_prior(), np.log((1.0 / 20.0)))
+        self.assertAlmostEqual(h2.log_prior(), np.log((1.0 / 4.0)**4 * (1.0 / 20.0)))
 
     def test_bdaooss_add_remove_part(self):
         # test with no max_depth limit
