@@ -8,26 +8,28 @@ Created on Dec 2, 2015
 Goker Erdogan
 https://github.com/gokererdogan/
 """
+import cPickle as pkl
+
 from shape import *
 from voxel_based_shape import VoxelBasedShape, Voxel, EMPTY_VOXEL, FULL_VOXEL
+import geometry_3d
 
 
 def get_viewpoint(angle):
-    x = 2.0 * np.cos(angle / 180.0 * np.pi)
-    y = 2.0 * np.sin(angle / 180.0 * np.pi)
-    viewpoint = [(x, y, 2.0)]
-    return viewpoint
+    return geometry_3d.spherical_to_cartesian((np.sqrt(8.0), angle, 45.0))
 
 if __name__ == "__main__":
     import vision_forward_model as vfm
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
+
+    """
     # test 1
     parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.5, .75/2, .75/2])),
              CuboidPrimitive(np.array([.75/2, 0.0, 0.0]), np.array([.25, .25, .25]))]
 
     viewpoint = get_viewpoint(262)
     h = Shape(fwm, parts=parts, viewpoint=viewpoint)
-    # fwm._view(h)
+
     img = fwm.render(h)
     np.save('./data/test1_single_view.npy', img)
     fwm.save_render('./data/test1_single_view.png', h)
@@ -40,7 +42,7 @@ if __name__ == "__main__":
 
     viewpoint = get_viewpoint(296)
     h = Shape(fwm, parts=parts, viewpoint=viewpoint)
-    # fwm._view(h)
+
     img = fwm.render(h)
     np.save('./data/test2_single_view.npy', img)
     fwm.save_render('./data/test2_single_view.png', h)
@@ -55,11 +57,10 @@ if __name__ == "__main__":
 
     viewpoint = get_viewpoint(7)
     h = Shape(fwm, parts=parts, viewpoint=viewpoint)
-    # fwm._view(h)
+
     img = fwm.render(h)
     np.save('./data/test3_single_view.npy', img)
     fwm.save_render('./data/test3_single_view.png', h)
-
 
     # test 4
     viewpoint = get_viewpoint(49)
@@ -131,4 +132,19 @@ if __name__ == "__main__":
     img = fwm.render(v)
     np.save('./data/test5_single_view.npy', img)
     fwm.save_render('./data/test5_single_view.png', v)
+    """
 
+    # test 6
+    import paperclip_shape as pc_shape
+    joint_positions = np.array([[-0.54028188,  0.41323616,  0.19661439],
+                                   [-0.20661808,  0.51499101, -0.1030599 ],
+                                   [-0.12298621,  0.        ,  0.        ],
+                                   [ 0.12298621,  0.        ,  0.        ],
+                                   [ 0.84088651,  0.1529245 , -0.10760027],
+                                   [ 0.4336905 , -0.07415333, -1.01534363]])
+
+    pc = pc_shape.PaperClipShape(forward_model=fwm, viewpoint=get_viewpoint(45.0), joint_positions=joint_positions)
+    img = fwm.render(pc)
+    np.save('./data/test6_single_view.npy', img)
+    fwm.save_render('./data/test6_single_view.png', pc)
+    pkl.dump(pc, open('./data/test6.pkl', 'w'))

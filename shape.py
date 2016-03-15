@@ -93,14 +93,21 @@ class Shape(hyp.I3DHypothesis):
                     self.parts.append(CuboidPrimitive())
 
     @staticmethod
-    def from_narray(arr, forward_model, viewpoint=None, params=None):
+    def from_array(arr, forward_model, viewpoint=None, params=None):
         """
         Create a Shape object from a numpy array.
-        arr contains the positions and sizes of each part.
-        It is a vector of length (number of parts) * 6; however
-        the array may in fact be larger and contain zeros.
-        Therefore, objects with zero size are ignored.
-        Format: part1_pos, part1_size, part2_pos, part2_size, ...
+
+        Parameters:
+            arr (numpy.ndarray): Contains the positions and sizes of each part.
+                It is a vector of length (number of parts) * 6; however the array may in fact be larger and contain zeros.
+                Therefore, objects with zero size are ignored.
+                Format: part1_pos, part1_size, part2_pos, part2_size, ...
+            forward_model (VisionForwardModel):
+            viewpoint (list of 3-tuples):
+            params (dict):
+
+        Returns:
+            Shape instance
         """
         parts = []
         maxN = int(arr.size / 6.0)
@@ -132,7 +139,6 @@ class Shape(hyp.I3DHypothesis):
         """
         Returns the positions of parts and their sizes.
         Used by VisionForwardModel for rendering.
-        :return: positions and sizes of parts
         """
         positions = []
         sizes = []
@@ -160,7 +166,7 @@ class Shape(hyp.I3DHypothesis):
         s = "Id   Position            Size                \n"
         fmt = "{0:5}{1:40}\n"
         for i, part in enumerate(self.parts):
-            s = s + fmt.format(str(i), str(part))
+            s += fmt.format(str(i), str(part))
         return s
 
     def __repr__(self):
@@ -214,7 +220,7 @@ class Shape(hyp.I3DHypothesis):
 
         return dist
 
-    def to_narray(self):
+    def to_array(self):
         """
         Converts object to numpy array of length 6 * (number of parts)
         Format: part1_pos, part1_size, part2_pos, part2_size, ...
@@ -353,13 +359,13 @@ if __name__ == "__main__":
     moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part': shape_move_part,
              'shape_move_part_local': shape_move_part_local, 'shape_change_part_size': shape_change_part_size,
              'shape_change_part_size_local': shape_change_part_size_local, 'shape_move_object': shape_move_object,
-             'change_viewpoint': i3d_proposal.change_viewpoint}
+             'change_viewpoint': i3d_proposal.change_viewpoint_z}
              """
 
     moves = {'shape_add_remove_part': shape_add_remove_part,
              'shape_move_part_local': shape_move_part_local,
              'shape_change_part_size_local': shape_change_part_size_local,
-             'change_viewpoint': i3d_proposal.change_viewpoint}
+             'change_viewpoint': i3d_proposal.change_viewpoint_z}
 
     params = {'MOVE_PART_VARIANCE': 0.00005,
               'MOVE_OBJECT_VARIANCE': 0.00005,

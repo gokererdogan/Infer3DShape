@@ -20,13 +20,16 @@ class BDAoOSSShapeMaxD(BDAoOSSShape):
     uses a new prior distribution over hypotheses.
 
     Note that this class in fact does not enforce the maximum depth constraint. That is achieved by the proposal
-    functions. However, this class defines a new prior over hypotheses; that is the main reason we want to constrain
-    tree depth.
+    functions. However, this new class enables us to define a new prior over hypotheses; that is the main reason we
+    want to constrain tree depth. HOWEVER, currently this class uses the same prior with BDAoOSSShape; therefore, this
+    class is almost unnecessary. However, because the proposal functions check the maximum depth by looking the the
+    `max_depth` attribute, we need this class for now. We should probably get rid of this class by moving `max_depth`
+     to BDAoOSSShape in the future.
     """
     def __init__(self, forward_model, shape=None, viewpoint=None, params=None, max_depth=10):
         """Initialize BDAoOSSShapeMaxD instance
 
-        Args:
+        Parameters:
             max_depth (int): Maximum depth allowed for trees
 
         Returns:
@@ -44,11 +47,12 @@ class BDAoOSSShapeMaxD(BDAoOSSShape):
             (float): log prior for the hypothesis.
         """
         """
-        # assume a uniform prior over number of parts. we can achieve this by letting the derivation prob. for all
-        # trees to be equal. Note that we still have to keep the spatial model probability as there are many hypotheses
+        # We initially wanted to use a uniform prior over number parts, here is how we can define it.
+        # To assume a uniform prior over number of parts, we can let the derivation prob. for all trees to be equal.
+        # Note that we still have to keep the spatial model probability as there are many hypotheses
         # with the same number of parts but with different spatial models.
-        # NOTE this prior will lead to chains that are potentially quite slow since the chain will spend an equal
-        # amount of time sampling quite large trees as it does sampling small trees.
+        # NOTE we are not using this prior, because it will lead to chains that are potentially quite slow since
+        # the chain will spend an equal amount of time sampling quite large trees as it does sampling small trees.
         return np.log(self.shape.spatial_model.probability())
         """
         # use the same prior with BDAoOSSShape

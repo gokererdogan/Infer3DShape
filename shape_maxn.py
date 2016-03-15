@@ -78,11 +78,12 @@ if __name__ == "__main__":
     moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part': shape_move_part,
              'shape_move_part_local': shape_move_part_local, 'shape_change_part_size': shape_change_part_size,
              'shape_change_part_size_local': shape_change_part_size_local, 'shape_move_object': shape_move_object,
-             'change_viewpoint': i3d_proposal.change_viewpoint}
+             'change_viewpoint': i3d_proposal.change_viewpoint_z}
     """    
     
     moves = {'shape_add_remove_part': shape_add_remove_part, 'shape_move_part_local': shape_move_part_local,
-             'shape_change_part_size_local': shape_change_part_size_local, 'change_viewpoint': i3d_proposal.change_viewpoint}
+             'shape_change_part_size_local': shape_change_part_size_local,
+             'change_viewpoint': i3d_proposal.change_viewpoint_z}
 
     params = {'MOVE_PART_VARIANCE': 0.00005,
               'MOVE_OBJECT_VARIANCE': 0.00005,

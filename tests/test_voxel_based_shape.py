@@ -9,12 +9,10 @@ Goker Erdogan
 https://github.com/gokererdogan/
 """
 
-import pdb
-import unittest
-
 from mcmclib.proposal import RandomMixtureProposal
 from mcmclib.mh_sampler import MHSampler
 
+from i3d_test_case import *
 from Infer3DShape.voxel_based_shape import *
 
 
@@ -40,7 +38,7 @@ Most of these tests assume that space is [-0.75, 0.75] x [-0.75, 0.75] x [-0.75,
 """
 
 
-class VoxelBasedShapeTest(unittest.TestCase):
+class VoxelBasedShapeTest(I3DTestCase):
     def assertAlmostIn(self, val, arr):
         found = False
         for comp in arr:

@@ -55,7 +55,7 @@ if __name__ == "__main__":
             df.loc[i] = [obj, comparison, p_comp_target, p_target_comp, (p_comp_target + p_target_comp) / 2.0]
             i += 1
 
-    predictions = psql.sqldf("select d1.Comparison as Comparison1, d2.Comparison as Comparison2, "
+    predictions = psql.sqldf("select d1.Target as Target, d1.Comparison as Comparison1, d2.Comparison as Comparison2, "
                              "d1.p_comp_target > d2.p_comp_target as I3D_pcomp_GT_Prediction, "
                              "d1.p_target_comp > d2.p_target_comp as I3D_ptarget_GT_Prediction, "
                              "d1.p_avg > d2.p_avg as I3D_pavg_GT_Prediction "

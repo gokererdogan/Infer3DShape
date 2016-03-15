@@ -45,7 +45,7 @@ def get_seqs_with_sum(total, max_allowed=VOXELS_PER_AXIS**3, length=1000):
     Possible assignments are: [0, 3], [1, 2], [2, 1], [3, 0] where the first element is the number of children partial
     voxels of first voxel, and the second element is second voxel's number of chilren partial voxels.
 
-    Args:
+    Parameters:
         total (int): the desired total of the sequence. must be positive.
         max_allowed (int): maximum number allowed in the sequence. must be positive.
         (int): Length of the sequence.
@@ -94,7 +94,7 @@ def count_trees(partial_count, max_voxels=VOXELS_PER_AXIS**3, depth=0, max_depth
     """This function calculates the number of possible voxel representations with a given number of partial voxel count
     and maximum depth. This is necessary for calculating the prior probability of a hypothesis.
 
-    Args:
+    Parameters:
         partial_count (int): Number of partial voxels in representation. NOTE that we do not count the root partial node
             here.
         max_voxels (int): Maximum number of voxels at one level (i.e., the branching factor of the tree)
@@ -315,7 +315,7 @@ class Voxel(object):
                 s += "|"
                 for i in range(self.voxels_per_axis):
                     for k in range(self.voxels_per_axis):
-                        s = s + " {0:d} ".format(self.subvoxels[i, j, k].status)
+                        s += " {0:d} ".format(self.subvoxels[i, j, k].status)
                     s += " | "
                 s += "\n"
         else:
@@ -325,8 +325,8 @@ class Voxel(object):
 
 
 class VoxelBasedShape(I3DHypothesis):
-    """VoxelBasedShape class defines a 3D object by splitting the 3D space into voxels and
-    representing an object as a list of occupied voxels.
+    """VoxelBasedShape class defines a 3D object by splitting the 3D space into voxels and representing an object
+    as a tree of occupied voxels.
     """
     def __init__(self, forward_model, viewpoint=None, params=None, voxel=None,
                  scale=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0), voxels_per_axis=VOXELS_PER_AXIS,
@@ -461,7 +461,6 @@ class VoxelBasedShapeMaxD(VoxelBasedShape):
         return self_copy
 
 
-# -----------------------------
 # PROPOSAL FUNCTIONS
 
 
@@ -718,7 +717,7 @@ if __name__ == "__main__":
              'voxel_flip_partial_vs_full': voxel_based_shape_flip_full_vs_partial,
              'voxel_flip_partial_vs_empty': voxel_based_shape_flip_empty_vs_partial,
              'voxel_scale_space': voxel_scale_space,
-             'change_viewpoint': i3d_proposal.change_viewpoint}
+             'change_viewpoint': i3d_proposal.change_viewpoint_z}
 
     params = {'SCALE_SPACE_VARIANCE': 0.0025, 'CHANGE_VIEWPOINT_VARIANCE': 30.0, 'MAX_DEPTH': max_depth}
 

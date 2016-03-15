@@ -17,7 +17,7 @@ import Infer3DShape.i3d_likelihood as ll
 
 # assuming that pixels ~ unif(0,1), expected variance of a pixel difference is 1/6
 LL_VARIANCE = 0.0001 # in squared pixel distance
-MAX_PIXEL_VALUE = 175.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
+MAX_PIXEL_VALUE = 177.0 # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
 # sigma for the Gaussian filter used in likelihood_pixel_gaussian_filtered
 LL_FILTER_SIGMA = 2.0
 
@@ -29,14 +29,20 @@ class I3DHypothesis(hyp.Hypothesis):
 
     Attributes:
         forward_model (VisionForwardModel): Forward model for rendering hypothesis
-        viewpoint (3-tuple): Viewpoint from which the object is viewed.
-            If not provided, viewpoint from forward_model is used
+        viewpoint (list of 3-tuple): Viewpoints (given in spherical coordinates) from which the object is viewed.
+            Each element is (r, theta, phi) where
+                r is the distance to origin, theta is the angle in the xy plane and phi is the angle away from the
+                z axis. Note that we are using the mathematics (not the physics) convention here.
+            If not provided, viewpoint from forward_model is used.
         params (dict): A dictionary of parameters (generally parameters related to likelihood calculations)
+        primitive_type (string): Type of primitive shape is made up from. It can be either CUBE or TUBE at
+            the moment. This information is used by VisionForwardModel to render the object.
     """
-    def __init__(self, forward_model, viewpoint=None, params=None):
+    def __init__(self, forward_model, viewpoint=None, params=None, primitive_type='CUBE'):
         hyp.Hypothesis.__init__(self)
         self.forward_model = forward_model
         self.viewpoint = viewpoint
+        self.primitive_type = primitive_type
         self.params = params
         # if params is not provided, use the default values
         if self.params is None:
@@ -57,14 +63,13 @@ class I3DHypothesis(hyp.Hypothesis):
         Overrides the method from base Hypothesis class. Right now, we use a pixel based likelihood model that assumes
         Gaussian noise.
 
-        Args:
-            data (np.array): Observed image
+        Parameters:
+            data (numpy.ndarray): Observed image
 
         Returns:
             float: log likelihood
         """
-        prediction = self.forward_model.render(self)
-        return ll.log_likelihood_pixel(prediction, data, self.params['MAX_PIXEL_VALUE'], self.params['LL_VARIANCE'])
+        return ll.log_likelihood_pixel(self, data, self.params['MAX_PIXEL_VALUE'], self.params['LL_VARIANCE'])
 
     def convert_to_positions_sizes(self):
         """Convert the shape hypothesis to lists of positions and sizes of each part.

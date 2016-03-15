@@ -4,3 +4,5 @@
 .idea/
 data/stimuli*/
 results/
+tests/htmlcov/
+tests/.coverage

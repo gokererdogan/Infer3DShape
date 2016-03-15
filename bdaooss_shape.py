@@ -23,7 +23,7 @@ class BDAoOSSShape(hyp.I3DHypothesis):
     def __init__(self, forward_model, shape=None, viewpoint=None, params=None):
         """Initialize BDAoOSSShape instance
 
-        Args:
+        Parameters:
             forward_model (VisionForwardModel): Instance of VisionForwardModel used for rendering
             viewpoint (list): Viewing orientation. Used only if viewpoint should also be inferred
 
@@ -51,8 +51,12 @@ class BDAoOSSShape(hyp.I3DHypothesis):
     def convert_to_positions_sizes(self):
         """
         Converts the BDAoOSS shape instance to lists of positions and sizes of parts.
+
         Used by VisionForwardModel for rendering.
-        :return: positions and sizes
+
+        Returns:
+            (list): positions
+            (list): sizes
         """
         parts, positions, sizes, viewpoint = self.shape.convert_to_parts_positions()
         # get rid of really small parts (this shouldn't happen)
@@ -100,10 +104,6 @@ class BDAoOSSShape(hyp.I3DHypothesis):
 
     def __ne__(self, other):
         return not self.__eq__(other)
-
-    def __getstate__(self):
-        # we cannot pickle VTKObjects, so get rid of them.
-        return {k: v for k, v in self.__dict__.iteritems() if k != 'forward_model'}
 
 
 # PROPOSAL FUNCTIONS

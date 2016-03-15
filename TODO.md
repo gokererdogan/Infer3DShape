@@ -41,3 +41,14 @@ and update these as we add/remove/change voxels.
 - ~~We shouldn't let part size to get really small (around 0.01 in any direction for example). Such small parts do not make
 sense. The right way to do this is by changing the prior on part sizes. Maybe we should constrain the range from below at
 0.01.~~
+- ~~Use spherical coordinates for viewpoint. Convert them to cartesian in vision_forward_model~~
+- You can't have multiple offscreen rendering forward models in VTK. See if there is a way around this.
+- Reformat docstrings so sphinx can autogenerate documentation. Should I use native sphinx format or numpydoc?
+- BDAoOSSShapeMaxD (also ShapeMaxN) should constrain the max depth themselves; right now proposal functions ensure that.
+This problem will be solved if we do not modify the insides of these from the proposal functions. Let these functions
+handle their internals themselves.
+- Get rid of BDAoOSSShapeMaxD because it is using the same prior with BDAoOSSShape.
+- A much cleaner way is for the add/remove part proposals to ask the shape instance if we can add/remove a part, and 
+also return where we can add them too. 
+- Proposal function still needs to know what the maximum number of parts is. Maybe we can define maxn in all classes,
+and let this be inf if there is no limit. 

@@ -8,14 +8,12 @@ Created on Dec 4, 2015
 Goker Erdogan
 https://github.com/gokererdogan/
 """
-
-import unittest
-
 import treelib
 import BDAoOSS.bdaooss_grammar as bd
 from mcmclib.proposal import DeterministicMixtureProposal
 from mcmclib.mh_sampler import MHSampler
 
+from i3d_test_case import *
 from Infer3DShape.bdaooss_shape import *
 from Infer3DShape.bdaooss_shape_maxd import *
 
@@ -31,27 +29,8 @@ class BDAoOSSShapeTestHypothesis(BDAoOSSShape):
         shape_copy = self.shape.copy()
         return BDAoOSSShapeTestHypothesis(shape=shape_copy)
 
-class BDAoOSSShapeTest(unittest.TestCase):
-    def assertNumpyArrayEqual(self, arr1, arr2):
-        if np.any(arr1 != arr2):
-            raise AssertionError("Numpy arrays are not equal: {0:s} - {1:s}".format(arr1, arr2))
 
-    def assertNumpyArrayNotEqual(self, arr1, arr2):
-        if np.all(arr1 == arr2):
-            raise AssertionError("Numpy arrays are equal: {0:s} - {1:s}".format(arr1, arr2))
-
-    def assertNumpyArrayListEqual(self, l1, l2):
-        if len(l1) != len(l2):
-            raise AssertionError("Lists {0:s} and {1:s} does not have the same number of elements.".format(l1, l2))
-        for i1 in l1:
-            found = False
-            for i2 in l2:
-                if np.all(i1 == i2):
-                    found = True
-                    break
-            if not found:
-                raise AssertionError("Item {0:s} cannot be found in list {1:s}".format(i1, l2))
-
+class BDAoOSSShapeTest(I3DTestCase):
     def create_test_shape1(self):
         n1 = bd.ParseNode('P', 0)
         n2 = bd.ParseNode('Null', '')

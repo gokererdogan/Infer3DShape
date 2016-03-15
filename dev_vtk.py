@@ -84,6 +84,33 @@ actorx.GetProperty().SetColor(1, 0, 0)
 actory.GetProperty().SetColor(0, 1, 0)
 actorz.GetProperty().SetColor(0, 1, 1)
 
+
+pts = vtk.vtkPoints()
+pts.InsertPoint(0, -0.6, 0.5, 0.0)
+pts.InsertPoint(1, -0.2, 0.0, 0.0)
+pts.InsertPoint(2, 0.5, 0.0, 0.0)
+
+lines = vtk.vtkCellArray()
+lines.InsertNextCell(3)
+lines.InsertCellPoint(0)
+lines.InsertCellPoint(1)
+lines.InsertCellPoint(2)
+
+td = vtk.vtkPolyData()
+td.SetPoints(pts)
+td.SetLines(lines)
+
+tubef = vtk.vtkTubeFilter()
+tubef.SetInput(td)
+tubef.SetRadius(0.1)
+tubef.SetNumberOfSides(50)
+tubef.Update()
+
+tubemapper = vtk.vtkPolyDataMapper()
+tubemapper.SetInput(tubef.GetOutput())
+tubeActor = vtk.vtkActor()
+tubeActor.SetMapper(tubemapper)
+
 # lighting
 light1 = vtk.vtkLight()
 light1.SetIntensity(.7)
@@ -127,10 +154,11 @@ renderWindow.SetSize(600, 600)
 renderWindowInteractor = vtk.vtkRenderWindowInteractor()
 renderWindowInteractor.SetRenderWindow(renderWindow)
 
-renderer.AddActor(part1Actor)
+# renderer.AddActor(part1Actor)
 renderer.AddActor(actorx)
 renderer.AddActor(actory)
 renderer.AddActor(actorz)
+renderer.AddActor(tubeActor)
 
 #renderer.RemoveAllViewProps()
 

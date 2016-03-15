@@ -9,11 +9,10 @@ Goker Erdogan
 https://github.com/gokererdogan/
 """
 
-import unittest
-
 from mcmclib.proposal import DeterministicMixtureProposal
 from mcmclib.mh_sampler import MHSampler
 
+from i3d_test_case import *
 from Infer3DShape.shape import *
 from Infer3DShape.shape_maxn import *
 
@@ -35,7 +34,7 @@ class ShapeTestHypothesis(ShapeMaxN):
         return self_copy
 
 
-class ShapeTest(unittest.TestCase):
+class ShapeTest(I3DTestCase):
     def assertNumpyArrayEqual(self, arr1, arr2):
         if np.any(arr1 != arr2):
             raise AssertionError("Numpy arrays are not equal: {0:s} - {1:s}".format(arr1, arr2))
@@ -62,18 +61,18 @@ class ShapeTest(unittest.TestCase):
         p2.size[2] = 0.5
         self.assertNumpyArrayNotEqual(p1.size, p2.size)
 
-    def test_shape_from_narray(self):
+    def test_shape_from_array(self):
         pos1 = [0.0, 0.0, 0.0]
         pos2 = [0.1, -0.1, 0.2]
         size1 = [0.2, 0.3, 0.4]
         size2 = [0.2, 0.3, 0.1]
         arr = np.array(pos1 + size1 + pos2 + size2)
-        s = Shape.from_narray(arr, forward_model=None)
+        s = Shape.from_array(arr, forward_model=None)
         self.assertEqual(s.parts[0], CuboidPrimitive(pos1, size1))
         self.assertEqual(s.parts[1], CuboidPrimitive(pos2, size2))
         size2 = [0.0, 0.0, 0.0]
         arr = np.array(pos1 + size1 + pos2 + size2)
-        s = Shape.from_narray(arr, forward_model=None)
+        s = Shape.from_array(arr, forward_model=None)
         self.assertEqual(s.parts[0], CuboidPrimitive(pos1, size1))
         self.assertEqual(len(s.parts), 1)
 
@@ -157,7 +156,7 @@ class ShapeTest(unittest.TestCase):
         del s1.parts[0]
         self.assertNotEqual(s1, s2)
 
-    def test_shape_to_narray(self):
+    def test_shape_to_array(self):
         pos1 = [0.0, 0.0, 0.0]
         pos2 = [0.1, -0.1, 0.2]
         size1 = [0.2, 0.3, 0.4]
@@ -165,13 +164,13 @@ class ShapeTest(unittest.TestCase):
         part1 = CuboidPrimitive(pos1, size1)
         part2 = CuboidPrimitive(pos2, size2)
         s = Shape(forward_model=['old'], parts=[part1, part2], viewpoint=[(1.0, 1.0, 1.0)], params={'x': 1.0})
-        arr = s.to_narray()
+        arr = s.to_array()
         self.assertNumpyArrayEqual(arr, np.array(pos1 + size1 + pos2 + size2))
         s.parts[0].position = np.array([1.0, 1.0, 1.0])
-        arr = s.to_narray()
+        arr = s.to_array()
         self.assertNumpyArrayEqual(arr, np.array([1.0, 1.0, 1.0] + size1 + pos2 + size2))
         del s.parts[0]
-        arr = s.to_narray()
+        arr = s.to_array()
         self.assertNumpyArrayEqual(arr, np.array(pos2 + size2))
 
     def test_shape_add_remove_part(self):
