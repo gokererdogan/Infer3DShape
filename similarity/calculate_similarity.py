@@ -20,7 +20,7 @@ import Infer3DShape.vision_forward_model as vfm
 from mcmclib.mcmc_run import MCMCRun
 
 
-def calculate_probability_image_given_hypothesis(img, h):
+def calculate_probability_image_given_hypothesis(img, h, viewpoint_samples=180):
     """
     Calculates the log probability of image given hypothesis, p(I|H) = \int p(I,theta|H) dtheta, marginalizing out
     viewpoint theta. We assume p(theta) is uniform.
@@ -28,13 +28,15 @@ def calculate_probability_image_given_hypothesis(img, h):
     Parameters:
         img (numpy.array): image
         h (I3DHypothesis): shape hypothesis
+        viewpoint_samples (int): number of viewpoints to use to approximate the integral
 
     Returns:
-        float: log probability of image given hypothesis
+        float: log probability of image given hypothesis, averaged over all views
+        float: log probability of image given hypothesis for the best view
     """
-    ll = np.zeros(180)
+    ll = np.zeros(viewpoint_samples)
     # rotate the viewpoint around z axis
-    for i, theta in enumerate(range(0, 360, 2)):
+    for i, theta in enumerate(np.arange(0, 360, 360.0 / viewpoint_samples)):
         # update all viewpoints
         for v in range(len(h.viewpoint)):
             r, _, phi = h.viewpoint[v]
@@ -43,10 +45,10 @@ def calculate_probability_image_given_hypothesis(img, h):
         h._log_ll = None
         log_ll = h.log_likelihood(img)
         ll[i] = log_ll
-    return spmisc.logsumexp(ll)
+    return spmisc.logsumexp(ll) - np.log(viewpoint_samples), np.max(ll)
 
 
-def calculate_similarity(data1, samples, log_probs):
+def calculate_similarity_image_given_image(data1, samples, log_probs):
     """
     Calculate similarity between images data1 and data2 given samples from p(H, theta|data2).
     Similarity between data1 and data2 is defined to be p(data1|data2) calculated from
@@ -59,22 +61,29 @@ def calculate_similarity(data1, samples, log_probs):
         log_probs: log posterior probabilities of samples in ``samples``
 
     Returns:
-        float: lob p(data1|data2) calculated based on samples
+        float: log p(data1|data2) calculated based on samples
         float: log p(data1|data2) calculated by samples weighted by their posterior probabilities.
             Note this is not the correct approximation for p(data1|data2), but it sometimes gives
             good results.
+        float: log p(data1|data2) calculated based on samples with p(data|H) calculated from only the best view.
+        float: log p(data1|data2) calculated by samples weighted by their posterior probabilities and with p(data|H)
+            calculated from only the best view.
     """
-    probs = np.array([np.exp(lp) for lp in log_probs])
-    probs /= np.sum(probs)
-
     # calculate p(H|data2) for each sample in samples
-    logp_data1 = np.zeros(len(samples))
+    sample_count = len(samples)
+    logp_data1 = np.zeros(sample_count)  # log ll averaged over all views
+    best_logp_data1 = np.zeros(sample_count)  # log ll from the best view
     for i, sample in enumerate(samples):
         print('.'),
-        logp_data1[i] = calculate_probability_image_given_hypothesis(data1, sample)
+        logp_data1[i], best_logp_data1[i] = calculate_probability_image_given_hypothesis(data1, sample)
     print
 
-    return spmisc.logsumexp(logp_data1), spmisc.logsumexp(np.log(probs) + logp_data1)
+    p_avg = spmisc.logsumexp(logp_data1) - np.log(sample_count)
+    p_wavg = spmisc.logsumexp(logp_data1 + log_probs - spmisc.logsumexp(log_probs))
+    p_best = spmisc.logsumexp(best_logp_data1) - np.log(sample_count)
+    p_wbest = spmisc.logsumexp(best_logp_data1 + log_probs - spmisc.logsumexp(log_probs))
+
+    return p_avg, p_wavg, p_best, p_wbest
 
 
 def read_samples(run_file, forward_model):
@@ -141,12 +150,14 @@ if __name__ == "__main__":
             comp_samples, comp_log_probs, comp_best_samples, comp_best_log_probs = read_samples(run_file, fwm)
 
             # calculate similarities
-            p_comp_target, p_comp_target_w = calculate_similarity(comp_data, obj_samples, obj_log_probs)
-            p_target_comp, p_target_comp_w = calculate_similarity(obj_data, comp_samples, comp_log_probs)
-            p_comp_target_MAP, p_comp_target_MAP_w = calculate_similarity(comp_data, obj_best_samples,
-                                                                          obj_best_log_probs)
-            p_target_comp_MAP, p_target_comp_MAP_w = calculate_similarity(obj_data, comp_best_samples,
-                                                                          comp_best_log_probs)
+            p_comp_target, p_comp_target_w = calculate_similarity_image_given_image(comp_data, obj_samples,
+                                                                                    obj_log_probs)
+            p_target_comp, p_target_comp_w = calculate_similarity_image_given_image(obj_data, comp_samples,
+                                                                                    comp_log_probs)
+            p_comp_target_MAP, p_comp_target_MAP_w = calculate_similarity_image_given_image(comp_data, obj_best_samples,
+                                                                                            obj_best_log_probs)
+            p_target_comp_MAP, p_target_comp_MAP_w = calculate_similarity_image_given_image(obj_data, comp_best_samples,
+                                                                                            comp_best_log_probs)
             df.loc[i] = [obj, comparison,
                          p_comp_target, p_target_comp, (p_comp_target + p_target_comp) / 2.0,
                          p_comp_target_w, p_target_comp_w, (p_comp_target_w + p_target_comp_w) / 2.0,

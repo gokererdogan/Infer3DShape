@@ -8,6 +8,8 @@ Created on Dec 4, 2015
 Goker Erdogan
 https://github.com/gokererdogan/
 """
+import sys
+
 import treelib
 import BDAoOSS.bdaooss_grammar as bd
 from mcmclib.proposal import DeterministicMixtureProposal
@@ -179,6 +181,7 @@ class BDAoOSSShapeTest(I3DTestCase):
         self.assertAlmostEqual(p_h_hp, (1.0 / 2.0) * (1.0 / 4.0))
         self.assertEqual(len(hp.shape.spatial_model.spatial_states['n1'].occupied_faces), 2)
 
+    @unittest.skipIf('--nosampling' in sys.argv, "Sampling tests are turned off.")
     def test_bdaooss_add_remove_sample(self):
         # test if add_remove samples correctly
         # sample from the prior using add_remove and see if we get each tree with its expected probability.

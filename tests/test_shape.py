@@ -8,6 +8,7 @@ Created on Dec 2, 2015
 Goker Erdogan
 https://github.com/gokererdogan/
 """
+import sys
 
 from mcmclib.proposal import DeterministicMixtureProposal
 from mcmclib.mh_sampler import MHSampler
@@ -208,6 +209,8 @@ class ShapeTest(I3DTestCase):
         self.assertAlmostEqual(q_hp_h, p_hp_h)
         self.assertAlmostEqual(q_h_hp, p_h_hp)
 
+    @unittest.skipIf('--nosampling' in sys.argv, "Sampling tests are turned off.")
+    def test_shape_add_remove_sample(self):
         # test if add_remove_part traverses the sample space correctly
         # look at how much probability mass objects with a certain number of parts get
         maxn = 3

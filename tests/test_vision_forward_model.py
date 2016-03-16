@@ -165,7 +165,7 @@ class VisionForwardModelTestCustomLighting(unittest.TestCase):
     def test_render_tube_object_custom_lighting(self):
         # test object
         s = PaperClipShape(forward_model=None, params={'JOINT_VARIANCE': 0.2})
-        s.joint_positions=[(.6, 0.0, 0.0), (0.0, .6, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, .6)]
+        s.joint_positions = [(.6, 0.0, 0.0), (0.0, .6, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, .6)]
 
         r = self.fwm_custom_lighting.render(s)
         correct = np.load('test_images/tube_object_custom_lighting.npy')

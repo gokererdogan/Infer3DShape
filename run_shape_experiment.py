@@ -49,7 +49,7 @@ def run_shape_experiment(**kwargs):
         data_folder = kwargs['data_folder']
         sampler = kwargs['sampler']
         max_part_count = None
-        if 'max_part_count':
+        if 'max_part_count' in kwargs:
             max_part_count = kwargs['max_part_count']
         ll_variance = kwargs['ll_variance']
         max_pixel_value = kwargs['max_pixel_value']

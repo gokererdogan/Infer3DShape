@@ -18,6 +18,7 @@ import Infer3DShape.i3d_hypothesis as hyp
 import Infer3DShape.geometry_3d as geom_3d
 
 MIN_SEGMENT_LENGTH = 0.20
+MAX_XYZ = 1.0
 
 
 class PaperClipShape(hyp.I3DHypothesis):
@@ -34,60 +35,76 @@ class PaperClipShape(hyp.I3DHypothesis):
             random object and controls roughly the complexity of the object.
         joint_positions (list): If not provided, the object is initialized randomly. Each element of the list is a
             3-element numpy.ndarray containing the position of a joint.
+        joint_count (int): If joint_positions is not provided, a random shape with joint_count joints is created.
         mid_segment_id (int): Middle segment id. The middle segment is assumed to be aligned with the x-axis. This
             is to ensure that shape representations are unique; othwerwise viewpoint and shape is confounded.
         min_joints (int): Minimum number of joints
         max_joints (int): Maximum number of joints
     """
-    def __init__(self, forward_model, viewpoint=None, params=None, joint_positions=None, mid_segment_id=2, min_joints=5,
-                 max_joints=5):
-        hyp.I3DHypothesis.__init__(self, forward_model, viewpoint, params, primitive_type='TUBE')
+    def __init__(self, forward_model, viewpoint=None, params=None, joint_positions=None, joint_count=6, min_angle=30.0,
+                 max_angle=150.0, mid_segment_id=2, min_joints=2, max_joints=10):
+        hyp.I3DHypothesis.__init__(self, forward_model=forward_model, viewpoint=viewpoint, params=params,
+                                   primitive_type='TUBE')
+        if min_joints < 2:
+            min_joints = 2
+
+        if max_joints < min_joints:
+            raise ValueError("Maximum number of joints cannot be smaller than minimum number of joints.")
+
+        if max_joints == np.inf:
+            raise ValueError("Maximum number of joints has to be finite for the uniform prior. Please define a new "
+                             "prior if you want to let it be infinite.")
+
+        self.min_joints = min_joints
+        self.max_joints = max_joints
+
+        if mid_segment_id < 0 or mid_segment_id >= self.max_joints:
+                raise ValueError("Midsegment id out of bounds.")
+
+        self.mid_segment_id = mid_segment_id
 
         self.joint_positions = joint_positions
         if self.joint_positions is None:
-            # if no initial shape is provided, we assume it is a five segment shape and ignore min_joint, max_joints and
-            # mid_segment_id
-
-            if self.params is None or 'JOINT_VARIANCE' not in self.params:
-                raise ValueError("JOINT_VARIANCE parameter must be provided for initializing a random shape.")
-
             # randomly generate a new shape
-            self.max_joints = 6
-            self.min_joints = 6
-            self.mid_segment_id = 2
-            self.joint_count = 6
-            self.joint_positions = [np.array([-0.75, 0.0, 0.0]), np.array([-0.45, 0.0, 0.0]),
-                                    np.array([-0.15, 0.0, 0.0]), np.array([0.15, 0.0, 0.0]),
-                                    np.array([0.45, 0.0, 0.0]), np.array([0.75, 0.0, 0.0])]
+            self.joint_count = joint_count
+            if self.joint_count > self.max_joints or self.joint_count < min_joints:
+                raise ValueError("Joint count must be between min_joints and max_joints.")
 
-            # we assume the middle segment is always centered at the origin and aligned with the x axis.
-            for i in [0, 1, 4, 5]:
-                moved = False
-                while not moved:
-                    change = np.random.randn(3) * np.sqrt(self.params['JOINT_VARIANCE'])
-                    if self._can_joint_move(i, change, update_children=False):
-                        self.move_joint(i, change, update_children=False)
-                        moved = True
+            self.joint_positions = []
 
+            # add midsegment joints
+            midsegment_length = MIN_SEGMENT_LENGTH + (2.0 * MIN_SEGMENT_LENGTH * np.random.rand())
+            self.joint_positions.append(np.array((-midsegment_length/2.0, 0.0, 0.0)))
+            self.joint_positions.append(np.array((midsegment_length/2.0, 0.0, 0.0)))
+
+            # add left joints
+            for i in range(self.mid_segment_id):
+                added = False
+                while not added:
+                    segment_length = MIN_SEGMENT_LENGTH + (3.0 * MIN_SEGMENT_LENGTH * np.random.rand())
+                    direction = _get_random_vector_along(self.joint_positions[0] - self.joint_positions[1],
+                                                         min_angle=min_angle, max_angle=max_angle)
+                    joint_position = self.joint_positions[0] + (segment_length * direction)
+                    if np.all(joint_position < MAX_XYZ):
+                        self.joint_positions.insert(0, joint_position)
+                        added = True
+
+            # add right joints
+            for i in range(self.mid_segment_id+2, self.joint_count):
+                added = False
+                while not added:
+                    segment_length = MIN_SEGMENT_LENGTH + (3.0 * MIN_SEGMENT_LENGTH * np.random.rand())
+                    direction = _get_random_vector_along(self.joint_positions[-1] - self.joint_positions[-2],
+                                                         min_angle=min_angle, max_angle=max_angle)
+                    joint_position = self.joint_positions[-1] + (segment_length * direction)
+                    if np.all(joint_position < MAX_XYZ):
+                        self.joint_positions.append(joint_position)
+                        added = True
         else:  # use the initial shape provided in joint_positions
-            if min_joints < 2:
-                min_joints = 2
-
-            if max_joints < min_joints:
-                raise ValueError("Maximum number of joints cannot be smaller than minimum number of joints.")
-
-            if max_joints == np.inf:
-                raise ValueError("Maximum number of joints has to be finite for the uniform prior. Please define a new "
-                                 "prior if you want to let it be infinite.")
-
-            self.min_joints = min_joints
-            self.max_joints = max_joints
             self.joint_count = len(self.joint_positions)
 
-            if mid_segment_id < 0 or mid_segment_id >= self.joint_count-1:
+            if self.mid_segment_id >= self.joint_count-1:
                 raise ValueError("Midsegment id out of bounds.")
-
-            self.mid_segment_id = mid_segment_id
 
             if self.joint_count > self.max_joints or self.joint_count < self.min_joints:
                 raise ValueError("Number of joints has to be between min_joints and max_joints.")
@@ -121,7 +138,7 @@ class PaperClipShape(hyp.I3DHypothesis):
             raise ValueError('Joint id out out bounds.')
 
         return geom_3d.angle_between_vectors(self.joint_positions[joint_id-1] - self.joint_positions[joint_id],
-                                             self.joint_positions[joint_id] - self.joint_positions[joint_id+1])
+                                             self.joint_positions[joint_id+1] - self.joint_positions[joint_id])
 
     def change_segment_length(self, segment_id, change_ratio, update_children=False):
         """
@@ -134,7 +151,7 @@ class PaperClipShape(hyp.I3DHypothesis):
 
         Parameters:
             segment_id (int)
-            change (float): ratio of change in length. Has to be greater than -1. Length is multiplied by
+            change_ratio (float): ratio of change in length. Has to be greater than -1. Length is multiplied by
                 (1 + change)
             update_children: If True children segment positions are updated to keep their lengths the same.
                 children refer to the segments that are farther away from the midsegment than the updated
@@ -212,10 +229,14 @@ class PaperClipShape(hyp.I3DHypothesis):
                 return False
             # check the neighboring segments
             if not update_children:
-                new_left_length = self._calculate_new_segment_length(joint_id-1, -change)
-                new_right_length = self._calculate_new_segment_length(joint_id+1, -change)
-                if new_left_length < MIN_SEGMENT_LENGTH or new_right_length < MIN_SEGMENT_LENGTH:
-                    return False
+                if joint_id > 0:
+                    new_left_length = self._calculate_new_segment_length(joint_id-1, -change)
+                    if new_left_length < MIN_SEGMENT_LENGTH:
+                        return False
+                if joint_id < self.joint_count - 2:
+                    new_right_length = self._calculate_new_segment_length(joint_id+1, -change)
+                    if new_right_length < MIN_SEGMENT_LENGTH:
+                        return False
         elif joint_id < self.mid_segment_id:
             # only one joint on the left side of mid_segment will move.
             # we need to check the lengths of the segments sharing that joint.
@@ -260,6 +281,42 @@ class PaperClipShape(hyp.I3DHypothesis):
                 for s in range(joint_id+1, self.joint_count):
                     self.joint_positions[s] = self.joint_positions[s] + change
 
+    def can_rotate_midsegment(self, rot_axis, rot_angle):
+        """
+        Check if we can rotate the midsegment by rot_angle around rot_axis.
+
+        Parameters:
+            rot_axis (numpy.ndarray): Cartesian coordinates of the rotation axis
+            rot_angle (float): Rotation amount in degrees
+
+        Returns:
+            bool
+        """
+        old_midsegment = self.joint_positions[self.mid_segment_id]
+        new_midsegment = geom_3d.rotate_axis_angle(old_midsegment, rot_axis, rot_angle)
+
+        # we need to check if rotating creates a segment that is too short. Note that this could happen for
+        # neighboring segments of the midsegment
+        if self.mid_segment_id > 0:
+            new_joint_position = geom_3d.rotate_vector_by_vector(self.joint_positions[self.mid_segment_id-1],
+                                                                 old_z=new_midsegment, new_z=old_midsegment)
+
+            new_length = np.sqrt(np.sum(np.square(new_joint_position -
+                                                  self.joint_positions[self.mid_segment_id])))
+            if new_length < MIN_SEGMENT_LENGTH:
+                return False
+
+        if self.mid_segment_id < self.joint_count - 2:
+            new_joint_position = geom_3d.rotate_vector_by_vector(self.joint_positions[self.mid_segment_id+2],
+                                                                 old_z=new_midsegment, new_z=old_midsegment)
+
+            new_length = np.sqrt(np.sum(np.square(new_joint_position -
+                                                  self.joint_positions[self.mid_segment_id+1])))
+            if new_length < MIN_SEGMENT_LENGTH:
+                return False
+
+        return True
+
     def rotate_midsegment(self, rot_axis, rot_angle):
         """
         Rotates the midsegment.
@@ -271,6 +328,9 @@ class PaperClipShape(hyp.I3DHypothesis):
             rot_axis (numpy.ndarray): Cartesian coordinates of the rotation axis
             rot_angle (float): Rotation amount in degrees
         """
+        if not self.can_rotate_midsegment(rot_axis, rot_angle):
+            raise ValueError("Cannot rotate midsegment. Rotation leads to a too short segment.")
+
         old_midsegment = self.joint_positions[self.mid_segment_id]
         new_midsegment = geom_3d.rotate_axis_angle(old_midsegment, rot_axis, rot_angle)
         # rotate every joint (except the midsegment joints)
@@ -278,8 +338,11 @@ class PaperClipShape(hyp.I3DHypothesis):
             if i != self.mid_segment_id and i != self.mid_segment_id + 1:
                 # note that we are rotating such that the new midsegment becomes the old one because the joints
                 # rotate in the opposite direction to the midsegment
-                self.joint_positions[i] = geom_3d.rotate_vector_by_vector(self.joint_positions[i], old_z=new_midsegment,
+                new_joint_position = geom_3d.rotate_vector_by_vector(self.joint_positions[i], old_z=new_midsegment,
                                                                           new_z=old_midsegment)
+
+                # update joint position
+                self.joint_positions[i] = new_joint_position
 
     def convert_to_positions_sizes(self):
         """
@@ -431,13 +494,20 @@ class PaperClipShape(hyp.I3DHypothesis):
         return choices
 
 
-def _get_random_vector_along(z_vector):
+def _get_random_vector_along(z_vector, min_angle=30.0, max_angle=180.0):
     """
-    Get a random vector that makes more than 30 degrees with the `z_vector`.
+    Get a random vector that makes more than min_angles and less than max_angles degrees with the `z_vector`.
 
-    This method is used by ``paperclip_shape_add_remove_joint`` move.
+    This method is used by ``paperclip_shape_add_remove_joint`` move. Note that the angle between the returned vector
+    and the -z_vector (NEGATIVE z_vector, not the z_vector) will be in (min_angle, max_angle). If we add such a vector
+    to z_vector, the angle between z_vector and the new vector will be in (min_angle, max_angle).
     """
-    phi = (np.random.rand() * 150.0) + 30.0
+    if max_angle < min_angle:
+        raise ValueError("Maximum angle cannot be smaller than minimum angle.")
+
+    max_phi = 180.0 - min_angle
+    min_phi = 180.0 - max_angle
+    phi = min_phi + (np.random.rand() * (max_phi - min_phi))
     theta = np.random.rand() * 360.0
     coords = geom_3d.spherical_to_cartesian((1.0, theta, phi))
     
@@ -577,7 +647,10 @@ def paperclip_shape_rotate_midsegment(h, params):
     rotation_angle = np.random.vonmises(0.0, kappa) * 180.0 / np.pi
 
     # rotate midsegment
-    hp.rotate_midsegment(rotation_axis, rotation_angle)
+    try:  # we might not be able to rotate midsegment by rotation_angle around rotation_axis
+        hp.rotate_midsegment(rotation_axis, rotation_angle)
+    except ValueError:
+        return hp, 1.0, 1.0
 
     # rotate each viewpoint to correct for the rotation of the joints (we want only the midsegment to change how it
     # looks)
@@ -594,9 +667,9 @@ if __name__ == "__main__":
     import mcmclib.proposal
     import i3d_proposal
 
-    fwm = vfm.VisionForwardModel(render_size=(200, 200), offscreen_rendering=False)
-    h = PaperClipShape(forward_model=fwm, viewpoint=[(np.sqrt(2.0), -np.sqrt(2.0), 2.0)], max_joints=10,
-                           params={'LL_VARIANCE': 0.0001, 'JOINT_VARIANCE': 0.3})
+    fwm = vfm.VisionForwardModel(render_size=(200, 200), offscreen_rendering=False, custom_lighting=False)
+    h = PaperClipShape(forward_model=fwm, viewpoint=[np.array((np.sqrt(8.0), 0.0, 30.0))], min_joints=2, max_joints=10,
+                           params={'LL_VARIANCE': 0.0001, 'MAX_PIXEL_VALUE': 255.0, 'JOINT_VARIANCE': 0.3})
 
     moves = {'paperclip_move_joints': paperclip_shape_move_joint,
              'paperclip_move_branch': paperclip_shape_move_branch,
@@ -604,13 +677,13 @@ if __name__ == "__main__":
              'paperclip_change_branch_length': paperclip_shape_change_branch_length,
              'paperclip_add_remove_joint': paperclip_shape_add_remove_joint,
              'paperclip_rotate_midsegment': paperclip_shape_rotate_midsegment,
-             'change_viewpoint_z': i3d_proposal.change_viewpoint_z}
+             'change_viewpoint': i3d_proposal.change_viewpoint}
 
     params = {'MOVE_JOINT_VARIANCE': 0.005,
               'MAX_NEW_SEGMENT_LENGTH': 0.6,
               'MAX_SEGMENT_LENGTH_CHANGE': 0.6,
-              'ROTATE_MIDSEGMENT_VARIANCE': 100.0,
-              'CHANGE_VIEWPOINT_VARIANCE': 100.0}
+              'ROTATE_MIDSEGMENT_VARIANCE': 60.0,
+              'CHANGE_VIEWPOINT_VARIANCE': 30.0}
 
     proposal = mcmclib.proposal.RandomMixtureProposal(moves, params)
 

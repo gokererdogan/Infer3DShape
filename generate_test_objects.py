@@ -16,13 +16,13 @@ import geometry_3d
 
 
 def get_viewpoint(angle):
-    return geometry_3d.spherical_to_cartesian((np.sqrt(8.0), angle, 45.0))
+    return np.sqrt(8.0), angle, 45.0
 
 if __name__ == "__main__":
+    """
     import vision_forward_model as vfm
     fwm = vfm.VisionForwardModel(render_size=(200, 200))
 
-    """
     # test 1
     parts = [CuboidPrimitive(np.array([0.0, 0.0, 0.0]), np.array([0.5, .75/2, .75/2])),
              CuboidPrimitive(np.array([.75/2, 0.0, 0.0]), np.array([.25, .25, .25]))]
@@ -135,6 +135,9 @@ if __name__ == "__main__":
     """
 
     # test 6
+    import vision_forward_model as vfm
+    fwm = vfm.VisionForwardModel(render_size=(200, 200), custom_lighting=False)
+
     import paperclip_shape as pc_shape
     joint_positions = np.array([[-0.54028188,  0.41323616,  0.19661439],
                                    [-0.20661808,  0.51499101, -0.1030599 ],
@@ -143,7 +146,8 @@ if __name__ == "__main__":
                                    [ 0.84088651,  0.1529245 , -0.10760027],
                                    [ 0.4336905 , -0.07415333, -1.01534363]])
 
-    pc = pc_shape.PaperClipShape(forward_model=fwm, viewpoint=get_viewpoint(45.0), joint_positions=joint_positions)
+    pc = pc_shape.PaperClipShape(forward_model=fwm, viewpoint=[get_viewpoint(45.0)], joint_positions=joint_positions,
+                                 min_joints=2, max_joints=8, mid_segment_id=2)
     img = fwm.render(pc)
     np.save('./data/test6_single_view.npy', img)
     fwm.save_render('./data/test6_single_view.png', pc)

@@ -8,6 +8,7 @@ Created on Dec 24, 2015
 Goker Erdogan
 https://github.com/gokererdogan/
 """
+import sys
 
 from mcmclib.proposal import RandomMixtureProposal
 from mcmclib.mh_sampler import MHSampler
@@ -500,6 +501,7 @@ class VoxelBasedShapeTest(I3DTestCase):
         else:
             self.assertNotEqual(hp, self.s1)
 
+    @unittest.skipIf('--nosampling' in sys.argv, "Sampling tests are turned off.")
     def test_voxel_sample_prior(self):
         # test if sampling from the prior produces a set of samples with expected frequency statistics.
         # for the prior defined in VoxelBasedShapeMaxD, we would expect to see an equal number of samples for each

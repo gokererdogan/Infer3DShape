@@ -264,7 +264,7 @@ class VisionForwardModel:
         tf = vtk.vtkTubeFilter()
         tf.SetInput(td)
         tf.SetRadius(TUBE_RADIUS)
-        tf.SetVaryRadiusToVaryRadiusOff()
+        # tf.SetVaryRadiusToVaryRadiusOff()
         tf.SetCapping(1)
         tf.SetNumberOfSides(50)
         tf.Update()
@@ -272,6 +272,8 @@ class VisionForwardModel:
         tm.SetInput(tf.GetOutput())
         ta = vtk.vtkActor()
         ta.SetMapper(tm)
+        #ta.GetProperty().SetDiffuse(0.8)
+        ta.GetProperty().SetAmbient(0.25)
         self.vtkrenderer.AddActor(ta)
 
     def _view(self, shape):

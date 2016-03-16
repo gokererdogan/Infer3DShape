@@ -8,7 +8,7 @@ Created on Mar 13, 2016
 Goker Erdogan
 https://github.com/gokererdogan/
 """
-import numpy as np
+import sys
 
 from mcmclib.proposal import DeterministicMixtureProposal
 from mcmclib.mh_sampler import MHSampler
@@ -39,25 +39,28 @@ class PaperClipTestHypothesis(PaperClipShape):
 class PaperClipTest(I3DTestCase):
     def test_paperclip_init(self):
         # random object
-        # JOINT_VARIANCE must be provided
-        self.assertRaises(ValueError, PaperClipShape, forward_model=None)
-
-        s = PaperClipShape(forward_model=None, params={'JOINT_VARIANCE': 0.3})
-        self.assertEqual(s.max_joints, 6)
-        self.assertEqual(s.min_joints, 6)
+        s = PaperClipShape(forward_model=None)
+        self.assertEqual(s.max_joints, 10)
+        self.assertEqual(s.min_joints, 2)
         self.assertEqual(s.mid_segment_id, 2)
+        self.assertEqual(s.joint_count, 6)
         self.assertNumpyArrayEqual(s.joint_positions[s.mid_segment_id] + s.joint_positions[s.mid_segment_id+1], 0.0)
         self.assertNumpyArrayEqual(s.joint_positions[s.mid_segment_id][1:], 0.0)
         self.assertNumpyArrayEqual(s.joint_positions[s.mid_segment_id+1][1:], 0.0)
 
+        # check segment lengths
         for i in range(s.joint_count-1):
             self.assertGreater(s._get_segment_length(i), MIN_SEGMENT_LENGTH)
+
+        # check joint angles
+        for i in range(1, s.joint_count-1):
+            self.assertGreater(s._get_joint_angle(i), 30.0)
+            self.assertLess(s._get_joint_angle(i), 150.0)
 
         # random object
-        s = PaperClipShape(forward_model=None, max_joints=9, min_joints=-4, mid_segment_id=12,
-                           params={'JOINT_VARIANCE': 0.3})
-        self.assertEqual(s.max_joints, 6)
-        self.assertEqual(s.min_joints, 6)
+        s = PaperClipShape(forward_model=None, max_joints=9, min_joints=-4, mid_segment_id=2, joint_count=6)
+        self.assertEqual(s.max_joints, 9)
+        self.assertEqual(s.min_joints, 2)
         self.assertEqual(s.mid_segment_id, 2)
         self.assertNumpyArrayEqual(s.joint_positions[s.mid_segment_id] + s.joint_positions[s.mid_segment_id+1], 0.0)
 
@@ -67,33 +70,47 @@ class PaperClipTest(I3DTestCase):
         for i in range(s.joint_count-1):
             self.assertGreater(s._get_segment_length(i), MIN_SEGMENT_LENGTH)
 
-        # specify shape
-        self.assertRaises(ValueError, PaperClipShape, forward_model=None, joint_positions=[np.array((0.0, 0.0, 0.0))],
-                          max_joints=4, min_joints=5)
+        # check joint angles
+        for i in range(1, s.joint_count-1):
+            self.assertGreater(s._get_joint_angle(i), 30.0)
+            self.assertLess(s._get_joint_angle(i), 150.0)
 
-        self.assertRaises(ValueError, PaperClipShape, forward_model=None, joint_positions=[np.array((0.0, 0.0, 0.0))],
-                          max_joints=np.inf, min_joints=5)
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=4, min_joints=5, joint_count=4)
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=np.inf, min_joints=5, joint_count=5)
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=6, min_joints=2, mid_segment_id=-1, joint_count=4)
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=6, min_joints=2, mid_segment_id=6, joint_count=4)
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=6, min_joints=2, mid_segment_id=0, joint_count=7)
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=6, min_joints=4, mid_segment_id=0, joint_count=3)
 
-        self.assertRaises(ValueError, PaperClipShape, forward_model=None, joint_positions=[np.array((0.0, 0.0, 0.0))],
-                          max_joints=6, min_joints=2, mid_segment_id=-1)
+        # midsegment not centered at origin
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=6, min_joints=2, mid_segment_id=0,
+                          joint_positions=[np.array((0.1, 0.0, 0.0)), np.array((0.2, 0.0, 0.0))])
 
-        self.assertRaises(ValueError, PaperClipShape, forward_model=None, joint_positions=[np.array((0.0, 0.0, 0.0))],
-                          max_joints=6, min_joints=2, mid_segment_id=6)
+        # midsegment not aligned with x
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=6, min_joints=2, mid_segment_id=0,
+                          joint_positions=[np.array((0.1, 0.1, 0.1)), np.array((-0.1, -0.1, -0.1))])
 
-        self.assertRaises(ValueError, PaperClipShape, forward_model=None, joint_positions=[np.array((0.0, 0.0, 0.0))],
-                          max_joints=6, min_joints=2, mid_segment_id=6)
-
-        self.assertRaises(ValueError, PaperClipShape, forward_model=None, joint_positions=[np.array((0.1, 0.0, 0.0)),
-                                                                                 np.array((0.2, 0.0, 0.0))],
-                          max_joints=6, min_joints=2, mid_segment_id=0)
-
-        self.assertRaises(ValueError, PaperClipShape, forward_model=None, joint_positions=[np.array((0.1, 0.1, 0.1)),
-                                                                                 np.array((-0.1, -0.1, -0.1))],
-                          max_joints=6, min_joints=2, mid_segment_id=0)
-
+        # too short segment
         self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=6, min_joints=2, mid_segment_id=0,
                           joint_positions=[np.array((MIN_SEGMENT_LENGTH/4.0, 0.0, 0.0)),
                                            np.array((-MIN_SEGMENT_LENGTH/4.0, 0.0, 0.0))])
+
+        # midsegment > joint_count
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=6, min_joints=2, mid_segment_id=1,
+                          joint_positions=[np.array((MIN_SEGMENT_LENGTH, 0.0, 0.0)),
+                                           np.array((-MIN_SEGMENT_LENGTH, 0.0, 0.0))])
+
+        # joint_count < max_joints
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=2, min_joints=2, mid_segment_id=0,
+                          joint_positions=[np.array((MIN_SEGMENT_LENGTH, 0.0, 0.0)),
+                                           np.array((-MIN_SEGMENT_LENGTH, 0.0, 0.0)),
+                                           np.array((-2*MIN_SEGMENT_LENGTH, 0.0, 0.0))])
+
+        # joint_count > min_joints
+        self.assertRaises(ValueError, PaperClipShape, forward_model=None, max_joints=4, min_joints=4, mid_segment_id=0,
+                          joint_positions=[np.array((MIN_SEGMENT_LENGTH, 0.0, 0.0)),
+                                           np.array((-MIN_SEGMENT_LENGTH, 0.0, 0.0)),
+                                           np.array((-2*MIN_SEGMENT_LENGTH, 0.0, 0.0))])
 
     def test_paperclip_get_segment_length(self):
         s = PaperClipShape(forward_model=None, joint_positions=[np.array((0.5, 0.0, 0.0)), np.array((0.2, 0.0, 0.0)),
@@ -113,7 +130,7 @@ class PaperClipTest(I3DTestCase):
 
         self.assertRaises(ValueError, s._get_joint_angle, joint_id=0)
         self.assertRaises(ValueError, s._get_joint_angle, joint_id=3)
-        self.assertAlmostEqual(s._get_joint_angle(1), 45.0)
+        self.assertAlmostEqual(s._get_joint_angle(1), 135.0)
         self.assertAlmostEqual(s._get_joint_angle(2), 90.0)
 
     def test_paperclip_change_segment_length(self):
@@ -468,7 +485,7 @@ class PaperClipTest(I3DTestCase):
         z = np.random.randn(3)
         for i in range(1000):
             v = _get_random_vector_along(z)
-            self.assertGreater(geom_3d.angle_between_vectors(v, z), 30.0)
+            self.assertGreater(geom_3d.angle_between_vectors(v, -z), 30.0)
             self.assertAlmostEqual(np.linalg.norm(v), 1.0)
 
     def test_paperclip_add_remove_joint_move(self):
@@ -617,6 +634,7 @@ class PaperClipTest(I3DTestCase):
         self.assertNumpyArrayNotEqual(geom_3d.spherical_to_cartesian(h.viewpoint[0]),
                                       geom_3d.spherical_to_cartesian(hp.viewpoint[0]))
 
+    @unittest.skipIf('--nosampling' in sys.argv, "Sampling tests are turned off.")
     def test_paperclip_add_remove_joint_sample(self):
         # test if add_remove_joint traverses the sample space correctly
         # look at how much probability mass objects with a certain number of parts get
