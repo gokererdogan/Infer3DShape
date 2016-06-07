@@ -155,9 +155,9 @@ renderWindowInteractor = vtk.vtkRenderWindowInteractor()
 renderWindowInteractor.SetRenderWindow(renderWindow)
 
 # renderer.AddActor(part1Actor)
-renderer.AddActor(actorx)
-renderer.AddActor(actory)
-renderer.AddActor(actorz)
+# renderer.AddActor(actorx)
+# renderer.AddActor(actory)
+# renderer.AddActor(actorz)
 renderer.AddActor(tubeActor)
 
 #renderer.RemoveAllViewProps()
@@ -170,6 +170,16 @@ renderer.AddLight(light1)
 renderer.AddLight(light2)
 renderer.AddLight(light3)
 renderWindow.Render()
+
+vtkwin_im = vtk.vtkWindowToImageFilter()
+vtkwin_im.SetInput(renderWindow)
+vtkwin_im.Update()
+
+vtk_image = vtkwin_im.GetOutput()
+height, width, _ = vtk_image.GetDimensions()
+vtk_array = vtk_image.GetPointData().GetScalars()
+components = vtk_array.GetNumberOfComponents()
+arr = vtk_to_numpy(vtk_array).reshape(height, width, components)
 
 """
 vrml_exporter = vtk.vtkVRMLExporter()
@@ -184,4 +194,8 @@ obj_exporter.Write()
 """
 
 renderWindowInteractor.Start()
+
+renderWindowInteractor.GetRenderWindow().Finalize()
+renderWindowInteractor.TerminateApp()
+del renderWindow, renderWindowInteractor
 

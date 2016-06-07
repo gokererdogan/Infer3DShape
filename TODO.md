@@ -52,3 +52,6 @@ handle their internals themselves.
 also return where we can add them too. 
 - Proposal function still needs to know what the maximum number of parts is. Maybe we can define maxn in all classes,
 and let this be inf if there is no limit. 
+- Unittest for paperclip_shape.calculate_moment_of_inertia is missing.
+- vision_forward_model RGB rendering tests
+- vision_forward_model.convert_world_to_display test

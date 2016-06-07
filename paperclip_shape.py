@@ -18,6 +18,8 @@ import Infer3DShape.i3d_hypothesis as hyp
 import Infer3DShape.geometry_3d as geom_3d
 
 MIN_SEGMENT_LENGTH = 0.20
+MEAN_SEGMENT_LENGTH = 0.60
+DEFAULT_SEGMENT_LENGTH_VARIANCE = 0.0001
 MAX_XYZ = 1.0
 
 
@@ -31,8 +33,8 @@ class PaperClipShape(hyp.I3DHypothesis):
     Attributes:
         forward_model (VisionForwardModel)
         viewpoint (list)
-        params (dict): PaperClipShape requires JOINT_VARIANCE parameter. This parameter is only used when creatinh a
-            random object and controls roughly the complexity of the object.
+        params (dict): PaperClipShape requires SEGMENT_LENGTH_VARIANCE parameter. This parameter is only used when creating a
+            random object and controls how much segment length varies around the MEAN_SEGMENT_LENGTH.
         joint_positions (list): If not provided, the object is initialized randomly. Each element of the list is a
             3-element numpy.ndarray containing the position of a joint.
         joint_count (int): If joint_positions is not provided, a random shape with joint_count joints is created.
@@ -70,10 +72,15 @@ class PaperClipShape(hyp.I3DHypothesis):
             if self.joint_count > self.max_joints or self.joint_count < min_joints:
                 raise ValueError("Joint count must be between min_joints and max_joints.")
 
+            if 'SEGMENT_LENGT_VARIANCE' not in self.params:
+                self.params['SEGMENT_LENGTH_VARIANCE'] = DEFAULT_SEGMENT_LENGTH_VARIANCE
+
+            length_sd = np.sqrt(self.params['SEGMENT_LENGTH_VARIANCE'])
+
             self.joint_positions = []
 
             # add midsegment joints
-            midsegment_length = MIN_SEGMENT_LENGTH + (2.0 * MIN_SEGMENT_LENGTH * np.random.rand())
+            midsegment_length = MEAN_SEGMENT_LENGTH + (np.random.randn() * length_sd)
             self.joint_positions.append(np.array((-midsegment_length/2.0, 0.0, 0.0)))
             self.joint_positions.append(np.array((midsegment_length/2.0, 0.0, 0.0)))
 
@@ -81,7 +88,7 @@ class PaperClipShape(hyp.I3DHypothesis):
             for i in range(self.mid_segment_id):
                 added = False
                 while not added:
-                    segment_length = MIN_SEGMENT_LENGTH + (3.0 * MIN_SEGMENT_LENGTH * np.random.rand())
+                    segment_length = MEAN_SEGMENT_LENGTH + (np.random.randn() * length_sd)
                     direction = _get_random_vector_along(self.joint_positions[0] - self.joint_positions[1],
                                                          min_angle=min_angle, max_angle=max_angle)
                     joint_position = self.joint_positions[0] + (segment_length * direction)
@@ -93,7 +100,7 @@ class PaperClipShape(hyp.I3DHypothesis):
             for i in range(self.mid_segment_id+2, self.joint_count):
                 added = False
                 while not added:
-                    segment_length = MIN_SEGMENT_LENGTH + (3.0 * MIN_SEGMENT_LENGTH * np.random.rand())
+                    segment_length = MEAN_SEGMENT_LENGTH + (np.random.randn() * length_sd)
                     direction = _get_random_vector_along(self.joint_positions[-1] - self.joint_positions[-2],
                                                          min_angle=min_angle, max_angle=max_angle)
                     joint_position = self.joint_positions[-1] + (segment_length * direction)
@@ -139,6 +146,29 @@ class PaperClipShape(hyp.I3DHypothesis):
 
         return geom_3d.angle_between_vectors(self.joint_positions[joint_id-1] - self.joint_positions[joint_id],
                                              self.joint_positions[joint_id+1] - self.joint_positions[joint_id])
+
+    def calculate_moment_of_inertia(self):
+        """
+        Calculates the moment of inertia of shape.
+
+        We treat each part as an infinitely thin rod.
+
+        Returns:
+            float: moment of inertia
+        """
+        mi = 0.0
+        for i in range(self.joint_count-1):
+            mi += self._get_segment_moment_of_inertia(i)
+
+        return mi
+
+    def _get_segment_moment_of_inertia(self, segment_id):
+        if segment_id < 0 or segment_id >= self.joint_count-1:
+            raise ValueError('Segment id out of bounds.')
+
+        xs, ys, _ = self.joint_positions[segment_id]
+        xe, ye, _ = self.joint_positions[segment_id+1]
+        return (xs**2 + (xs * xe) * xe**2 + ys**2 + (ys * ye) + ye**2) / 3.0
 
     def change_segment_length(self, segment_id, change_ratio, update_children=False):
         """
@@ -669,7 +699,7 @@ if __name__ == "__main__":
 
     fwm = vfm.VisionForwardModel(render_size=(200, 200), offscreen_rendering=False, custom_lighting=False)
     h = PaperClipShape(forward_model=fwm, viewpoint=[np.array((np.sqrt(8.0), 0.0, 30.0))], min_joints=2, max_joints=10,
-                           params={'LL_VARIANCE': 0.0001, 'MAX_PIXEL_VALUE': 255.0, 'JOINT_VARIANCE': 0.3})
+                           params={'LL_VARIANCE': 0.0001, 'MAX_PIXEL_VALUE': 255.0, 'SEGMENT_LENGTH_VARIANCE': 0.0001})
 
     moves = {'paperclip_move_joints': paperclip_shape_move_joint,
              'paperclip_move_branch': paperclip_shape_move_branch,

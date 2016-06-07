@@ -3,7 +3,10 @@ Inferring 3D Shape from 2D Images
 
 Script for running tests. Enables the user to skip sampling tests and run only the selected test modules.
     Run using
-        python run_tests module1 module2 ... --nosampling
+        python run_tests.py module1 module2 ... --nosampling
+
+To run coverage analysis run (requires coverage.py to be installed)
+    coverage run --source ../ run_tests.py module1 module 2 ... --nosampling
 
 Created on Mar 16, 2016
 

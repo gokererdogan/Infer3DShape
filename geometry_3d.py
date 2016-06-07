@@ -86,7 +86,7 @@ def rotate_axis_angle(v, axis, angle):
     Returns:
         (numpy.ndarray): Rotated vector (x, y, z)
     """
-    if np.allclose(axis, 0.0):
+    if np.allclose(axis, 0.0) or np.allclose(v, 0.0):
         return v
 
     axis /= np.linalg.norm(axis)

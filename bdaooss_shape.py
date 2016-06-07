@@ -127,7 +127,7 @@ def bdaooss_add_remove_part(h, params):
         return hp, 1.0, 1.0
 
     # REMEMBER that our grammar allows P nodes to have at most 3 children.
-    # we can add nodes under the P nodes that have less than 3 children
+    # we can add nodes under the P nodes that have fewer than 3 children
     # we can remove P nodes that have a single child Null
     depths = {}
     # find the set of parent nodes we can add to and the set of nodes we can remove
@@ -305,20 +305,20 @@ if __name__ == "__main__":
     import mcmclib.proposal
     import i3d_proposal
 
-    fwm = vfm.VisionForwardModel(render_size=(200, 200))
-    h = BDAoOSSShape(forward_model=fwm, viewpoint=[(np.sqrt(2.0), -np.sqrt(2.0), 2.0)], params={'LL_VARIANCE': 0.0001})
+    fwm = vfm.VisionForwardModel(render_size=(200, 200), offscreen_rendering=False)
+    h = BDAoOSSShape(forward_model=fwm, viewpoint=[[np.sqrt(8.0), -45.0, 45.0]], params={'LL_VARIANCE': 0.0001})
 
     """
     moves = {'bdaooss_add_remove_part': bdaooss_add_remove_part, 'bdaooss_change_part_size': bdaooss_change_part_size,
              'bdaooss_change_part_size_local': bdaooss_change_part_size_local,
              'bdaooss_change_part_dock_face': bdaooss_change_part_dock_face,
-             'bdaooss_move_object': bdaooss_move_object, 'change_viewpoint': i3d_proposal.change_viewpoint}
+             'bdaooss_move_object': bdaooss_move_object, 'change_viewpoint': i3d_proposal.change_viewpoint_z}
              """
 
     moves = {'bdaooss_add_remove_part': bdaooss_add_remove_part,
              'bdaooss_change_part_size_local': bdaooss_change_part_size_local,
              'bdaooss_change_part_dock_face': bdaooss_change_part_dock_face,
-             'change_viewpoint': i3d_proposal.change_viewpoint}
+             'change_viewpoint': i3d_proposal.change_viewpoint_z}
 
     params = {'MOVE_OBJECT_VARIANCE': 0.00005,
               'CHANGE_SIZE_VARIANCE': 0.00005,

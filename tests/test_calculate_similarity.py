@@ -29,16 +29,21 @@ class CalculateSimilarityTest(I3DTestCase):
         image = np.load('test_images/test_image.npy')
 
         # calculate logp(image|sample)
-        logp, logp_max = calculate_probability_image_given_hypothesis(image, s, viewpoint_samples=180)
+        logp, logp_max = calculate_probability_image_given_hypothesis(image, s)
         # these are pre-calculated. NOTE these could change if VisionForwardModel changes.
-        self.assertAlmostEqual(logp, -0.38698888158103095)
+        self.assertAlmostEqual(logp, -0.60814961737968254)
         self.assertAlmostEqual(logp_max, 0.0)
 
         # calculate logp(blank image|sample)
         image = np.zeros((1, 200, 200))
-        logp, logp_max = calculate_probability_image_given_hypothesis(image, s, viewpoint_samples=180)
-        self.assertAlmostEqual(logp, -1.7362902909245306)
-        self.assertAlmostEqual(logp_max, -1.2966692431630578)
+        logp, logp_max = calculate_probability_image_given_hypothesis(image, s)
+        self.assertAlmostEqual(logp, -1.5146551964550277)
+        self.assertAlmostEqual(logp_max, -0.91822996736329843)
+
+        # change ll_variance and see if logp_max changes accordingly
+        s.params['LL_VARIANCE'] = 0.01
+        logp, logp_max = calculate_probability_image_given_hypothesis(image, s)
+        self.assertAlmostEqual(logp_max / 10.0, -0.91822996736329843)
 
     def test_calculate_similarity_image_given_image(self):
         fwm = i3d_vfm.VisionForwardModel(render_size=(200, 200), offscreen_rendering=True, custom_lighting=False)
@@ -58,19 +63,19 @@ class CalculateSimilarityTest(I3DTestCase):
         logp_avg, logp_wavg, logp_best, logp_wbest = calculate_similarity_image_given_image(image, [s1, s2],
                                                                                             [np.log(2.0), np.log(1.0)])
         # these are pre-calculated. NOTE these could change if VisionForwardModel changes.
-        self.assertAlmostEqual(logp_avg, np.log(0.42176727900195082))
-        self.assertAlmostEqual(logp_wavg, np.log(0.50754440113060817))
-        self.assertAlmostEqual(logp_best, np.log(0.58575908347843986))
-        self.assertAlmostEqual(logp_wbest, np.log(0.72383938898562661))
+        self.assertAlmostEqual(logp_avg, np.log(0.3549830885871178))
+        self.assertAlmostEqual(logp_wavg, np.log(0.41810779467381104))
+        self.assertAlmostEqual(logp_best, np.log(0.58679820659933835))
+        self.assertAlmostEqual(logp_wbest, np.log(0.72453213773289238))
 
         # calculate similarity from one sample
         logp_avg, logp_wavg, logp_best, logp_wbest = calculate_similarity_image_given_image(image, [s1], [np.log(2.0)])
 
         # these are pre-calculated. NOTE these could change if VisionForwardModel changes.
-        self.assertAlmostEqual(logp_avg, -0.38698888158103095)
-        self.assertAlmostEqual(logp_wavg, -0.38698888158103095)
-        self.assertAlmostEqual(logp_best, 0.0)
-        self.assertAlmostEqual(logp_wbest, 0.0)
+        self.assertAlmostEqual(logp_avg, np.log(0.54435720684719735))
+        self.assertAlmostEqual(logp_wavg, np.log(0.54435720684719735))
+        self.assertAlmostEqual(logp_best, np.log(1.0))
+        self.assertAlmostEqual(logp_wbest, np.log(1.0))
 
 
 

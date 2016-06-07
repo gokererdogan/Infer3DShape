@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     max_depth = 3
 
-    fwm = vfm.VisionForwardModel(render_size=(200, 200))
+    fwm = vfm.VisionForwardModel(render_size=(200, 200), offscreen_rendering=False, custom_lighting=True)
     h = BDAoOSSShapeMaxD(forward_model=fwm, viewpoint=[(np.sqrt(2.0), -np.sqrt(2.0), 2.0)],
                          params={'LL_VARIANCE': 0.0001}, max_depth=max_depth)
 

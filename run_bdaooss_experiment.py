@@ -27,6 +27,7 @@ def run_bdaooss_experiment(**kwargs):
             data_folder (str): folder containing the data files
             results_folder (str):
             sampler (str): see `run_chain` function
+            inverted (bool): whether the input image is inverted, i.e., upside down
             max_depth (int): maximum depth of the hypothesis trees
             ll_variance (float): variance of the Gaussian likelihood
             max_pixel_value (float): maximum pixel intensity value
@@ -47,6 +48,7 @@ def run_bdaooss_experiment(**kwargs):
         results_folder = kwargs['results_folder']
         data_folder = kwargs['data_folder']
         sampler = kwargs['sampler']
+        inverted = kwargs['inverted']
         ll_variance = kwargs['ll_variance']
         max_pixel_value = kwargs['max_pixel_value']
         max_depth = None
@@ -72,10 +74,19 @@ def run_bdaooss_experiment(**kwargs):
     import vision_forward_model as vfm
 
     # read the data file
-    data = np.load("{0:s}/{1:s}_single_view.npy".format(data_folder, input_file))
-    render_size = data.shape[1:]
+    if not inverted:
+        viewpoint = [[np.sqrt(8.0), -45.0, 45.0]]
+        data = np.load("{0:s}/{1:s}_single_view.npy".format(data_folder, input_file))
+        custom_lighting = True
+    else:
+        data = np.load("{0:s}/{1:s}_single_view_inverted.npy".format(data_folder, input_file))
+        viewpoint = [[np.sqrt(8.0), -45.0, 135.0]]
+        # for inverted images we use VTK's default lighting because in the custom lighting, bottoms of objects are not
+        # well illuminated
+        custom_lighting = False
 
-    fwm = vfm.VisionForwardModel(render_size=render_size)
+    render_size = data.shape[1:]
+    fwm = vfm.VisionForwardModel(render_size=render_size, custom_lighting=custom_lighting, offscreen_rendering=True)
 
     shape_params = {'LL_VARIANCE': ll_variance, 'MAX_PIXEL_VALUE': max_pixel_value}
 
@@ -89,14 +100,13 @@ def run_bdaooss_experiment(**kwargs):
              'bdaooss_change_part_size_local': bdaooss.bdaooss_change_part_size_local,
              'bdaooss_change_part_dock_face': bdaooss.bdaooss_change_part_dock_face}
 
-    hypothesis_class = 'BDAoOSShape'
-    viewpoint = [(np.sqrt(8.0), -45.0, 45.0)]
     if max_depth is None:
+        hypothesis_class = 'BDAoOSShape'
         h = bdaooss.BDAoOSSShape(forward_model=fwm, viewpoint=viewpoint, params=shape_params)
 
     else:
         import bdaooss_shape_maxd as bdaooss_maxd
-        hypothesis_class = 'BDAoOSShapeMaxD'
+        hypothesis_class = 'BDAoOSSShapeMaxD'
         h = bdaooss_maxd.BDAoOSSShapeMaxD(forward_model=fwm, max_depth=max_depth, viewpoint=viewpoint,
                                           params=shape_params)
         kernel_params['MAX_DEPTH'] = max_depth
@@ -114,11 +124,15 @@ def run_bdaooss_experiment(**kwargs):
 
 if __name__ == "__main__":
     MAX_PIXEL_VALUE = 177.0  # this is usually 256.0 but in our case because of the lighting in our renders, it is lower
+    MAX_PIXEL_VALUE = 180.0  # this is slightly higher for inverted images because of lighting.
 
-    experiment = exp.Experiment(name="TestBDAoOSShape", experiment_method=run_bdaooss_experiment,
-                                sampler=['mh'], input_file=['test1'],
+    experiment = exp.Experiment(name="BDAoOSShapeInverted", experiment_method=run_bdaooss_experiment,
+                                sampler=['mh'],
+                                input_file=['o8_t1_cs_d1', 'o8_t1_cs_d2', 'o8_t2_ap_d1', 'o8_t2_ap_d2', 
+                                            'o8_t2_rp_d1', 'o8_t2_rp_d2', 'o8_t2_mf_d1', 'o8_t2_mf_d2'],
                                 results_folder='./results',
-                                data_folder='./data/',
+                                data_folder='./data/stimuli20150624_144833',
+                                inverted=True,  # whether the input image is inverted
                                 max_depth=5,
                                 max_pixel_value=MAX_PIXEL_VALUE,
                                 ll_variance=[0.0001],
@@ -127,8 +141,13 @@ if __name__ == "__main__":
                                 burn_in=5000, sample_count=10, best_sample_count=10, thinning_period=10000,
                                 report_period=10000)
 
-    experiment.run(parallel=True, num_processes=3)
+    experiment.run(parallel=True, num_processes=-1)
 
     print(experiment.results)
     experiment.save('./results')
-    experiment.append_csv('./results/TestBDAoOSShape.csv')
+    experiment.append_csv('./results/BDAoOSShapeInverted.csv')
+
+    """
+    input_file=['o1_t1_cs_d2', 'o1_t2_mf_d2', 'o3_t2_mf_d1',
+                'o3_t2_mf_d2', 'o10_t1_cs_d1', 'o10_t2_mf_d2'],
+    """

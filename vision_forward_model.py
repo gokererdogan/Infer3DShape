@@ -47,12 +47,6 @@ class VisionForwardModel:
         """
         self.render_size = render_size
         self.camera_pos = camera_pos
-        self.camera_pos_cartesian = []
-        # calculate camera up direction based on camera position
-        self.camera_up = []
-        for pos in self.camera_pos:
-            self.camera_pos_cartesian.append(geom3d.spherical_to_cartesian(pos))
-            self.camera_up.append(self._calculate_camera_up(pos))
 
         # vtk objects for rendering
         self.vtkrenderer = vtk.vtkRenderer()
@@ -60,9 +54,7 @@ class VisionForwardModel:
         self.camera_view_count = len(self.camera_pos)
         
         self.vtkcamera = vtk.vtkCamera()
-        self.vtkcamera.SetPosition(self.camera_pos_cartesian[0])
-        self.vtkcamera.SetFocalPoint(0, 0, 0)
-        self.vtkcamera.SetViewUp(self.camera_up[0])
+        self._setup_camera(self.camera_pos[0])
         # this is the view angle we used for rendering objects in blender.
         self.vtkcamera.SetViewAngle(35.0)
 
@@ -131,9 +123,20 @@ class VisionForwardModel:
         """
         Reset camera to its original position
         """
-        self.vtkcamera.SetPosition(self.camera_pos_cartesian[0])
-        self.vtkcamera.SetFocalPoint(0, 0, 0)
-        self.vtkcamera.SetViewUp(self.camera_up[0])
+        self._setup_camera(self.camera_pos[0])
+
+    def _setup_camera(self, camera_pos):
+        """
+        Set the camera position, view up and roll
+
+            camera_pos (3-tuple): Camera position in spherical coordinates
+        """
+        camera_pos_cartesian = geom3d.spherical_to_cartesian(camera_pos)
+        self.vtkcamera.SetPosition(camera_pos_cartesian)
+        # calculate camera up
+        # if viewpoint radius is negative, we invert the view, i.e., rotate camera upside down
+        camera_up = self._calculate_camera_up(camera_pos)
+        self.vtkcamera.SetViewUp(camera_up)
 
     @staticmethod
     def _calculate_camera_up(camera_pos):
@@ -165,7 +168,7 @@ class VisionForwardModel:
 
         return x, y, z
  
-    def render(self, shape):
+    def render(self, shape, rgb=False):
         """
         Construct the 3D object from Shape instance and render it.
         Returns numpy array with size number of viewpoints x self.render_size
@@ -174,6 +177,7 @@ class VisionForwardModel:
         Parameters:
             shape (I3DHypothesis): shape to render. should contain primitive_type attribute and
                 convert_to_positions_sizes method.
+            rgb (bool): return a grayscale or RGB image
 
         Returns:
             (numpy.ndarray): rendered image of the object from the specified viewpoints.
@@ -183,27 +187,23 @@ class VisionForwardModel:
         w = self.render_size[0]
         h = self.render_size[1]
 
-        # if shape has viewpoint defined, use that
-        camera_pos = self.camera_pos
-        camera_pos_cartesian = self.camera_pos_cartesian
+        camera_positions = self.camera_pos
         if shape.viewpoint is not None:
-            camera_pos = shape.viewpoint
-            camera_pos_cartesian = []
-            for pos in camera_pos:
-                camera_pos_cartesian.append(geom3d.spherical_to_cartesian(pos))
+            camera_positions = shape.viewpoint
 
-        img_arr = np.zeros((len(camera_pos), w, h))
-        for i in range(len(camera_pos)):
-            self.vtkcamera.SetPosition(camera_pos_cartesian[i])
-            # calculate camera up
-            camera_up = self._calculate_camera_up(camera_pos[i])
-            self.vtkcamera.SetViewUp(camera_up)
+        viewpoint_count = len(camera_positions)
+        if rgb:
+            img_arr = np.zeros((viewpoint_count, 3, w, h), dtype=np.uint8)
+        else:
+            img_arr = np.zeros((viewpoint_count, w, h))
 
-            img_arr[i, :, :] = self._render_window_to2D()
+        for i, camera_pos in enumerate(camera_positions):
+            self._setup_camera(camera_pos)
+            img_arr[i] = self._render_window_to2D(rgb)
 
         return img_arr
     
-    def _render_window_to2D(self):
+    def _render_window_to2D(self, rgb=False):
         """
         Renders the window to 2D grayscale image
         Called from render function for each viewpoint
@@ -214,11 +214,14 @@ class VisionForwardModel:
         self.vtkwin_im.Update()
 
         vtk_image = self.vtkwin_im.GetOutput()
-        height, width, _ = vtk_image.GetDimensions()
+        width, height, _ = vtk_image.GetDimensions()
         vtk_array = vtk_image.GetPointData().GetScalars()
         components = vtk_array.GetNumberOfComponents()
         arr = vtk_to_numpy(vtk_array).reshape(height, width, components)
-        arr = rgb2gray(arr)
+        if rgb:
+            arr = arr.transpose([2, 1, 0])
+        else:
+            arr = rgb2gray(arr)
 
         return arr
     
@@ -276,12 +279,33 @@ class VisionForwardModel:
         ta.GetProperty().SetAmbient(0.25)
         self.vtkrenderer.AddActor(ta)
 
+    def convert_world_to_display(self, viewpoint, x, y, z):
+        """Converts world coordinates x, y, z to display coordinates.
+
+        Used in 2D affine alignment model to get shape feature coordinates
+        in image.
+        """
+        self.vtkrenderer.SetActiveCamera(self.vtkcamera)
+        self._setup_camera(viewpoint)
+
+        vtkcoordinate = vtk.vtkCoordinate()
+        vtkcoordinate.SetCoordinateSystemToWorld()
+        vtkcoordinate.SetValue(x, y, z)
+        # x and y are flipped in render method.
+        y, x = vtkcoordinate.GetComputedDisplayValue(self.vtkrenderer)
+        return x, y
+
     def _view(self, shape):
         """
         Views object in window
         Used for development and testing purposes
         """
         self._build_scene(shape)
+
+        if shape.viewpoint is not None:
+            camera_pos = shape.viewpoint[0]
+            self._setup_camera(camera_pos)
+
         self.vtkrender_window.Render()
         self.vtkrender_window_interactor.Start()
 
@@ -306,9 +330,9 @@ class VisionForwardModel:
             simg.save("{0:s}_{1:d}.{2:s}".format(fn, i, ext))
 
 if __name__ == '__main__':
-    forward_model = VisionForwardModel()
+    forward_model = VisionForwardModel(render_size=(200, 300))
 
     import shape as hyp
     s = hyp.Shape(forward_model)
-
+    r = forward_model.render(s)
     forward_model.save_render('r.png', s)

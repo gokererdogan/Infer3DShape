@@ -21,7 +21,7 @@ from Infer3DShape.paperclip_shape import _get_random_vector_along
 class PaperClipTestHypothesis(PaperClipShape):
     def __init__(self, joint_positions=None, mid_segment_id=2):
         PaperClipShape.__init__(self, forward_model=None, joint_positions=joint_positions,
-                                params={'JOINT_VARIANCE': 0.2}, mid_segment_id=mid_segment_id,
+                                params={'SEGMENT_LENGTH_VARIANCE': 0.01}, mid_segment_id=mid_segment_id,
                                 min_joints=2, max_joints=4)
 
     def _calculate_log_likelihood(self, data=None):

@@ -20,7 +20,7 @@ import Infer3DShape.vision_forward_model as vfm
 from mcmclib.mcmc_run import MCMCRun
 
 
-def calculate_probability_image_given_hypothesis(img, h, viewpoint_samples=180):
+def calculate_probability_image_given_hypothesis(img, h, angle_increment=5):
     """
     Calculates the log probability of image given hypothesis, p(I|H) = \int p(I,theta|H) dtheta, marginalizing out
     viewpoint theta. We assume p(theta) is uniform.
@@ -28,24 +28,35 @@ def calculate_probability_image_given_hypothesis(img, h, viewpoint_samples=180):
     Parameters:
         img (numpy.array): image
         h (I3DHypothesis): shape hypothesis
-        viewpoint_samples (int): number of viewpoints to use to approximate the integral
+        angle_increment (int): angle between views used to approximate the integral
 
     Returns:
         float: log probability of image given hypothesis, averaged over all views
         float: log probability of image given hypothesis for the best view
     """
-    ll = np.zeros(viewpoint_samples)
-    # rotate the viewpoint around z axis
-    for i, theta in enumerate(np.arange(0, 360, 360.0 / viewpoint_samples)):
-        # update all viewpoints
+    theta_count = int(360.0 / angle_increment)
+    phi_count = int(180.0 / angle_increment)
+    ll = np.zeros((phi_count, theta_count))
+    for phi_i in range(phi_count):
+        # update phi for all viewpoints
         for v in range(len(h.viewpoint)):
-            r, _, phi = h.viewpoint[v]
-            h.viewpoint[v] = (r, theta, phi)
+            r, theta, phi = h.viewpoint[v]
+            phi = (phi + angle_increment) % 180
+            h.viewpoint[v] = [r, theta, phi]
 
-        h._log_ll = None
-        log_ll = h.log_likelihood(img)
-        ll[i] = log_ll
-    return spmisc.logsumexp(ll) - np.log(viewpoint_samples), np.max(ll)
+        for theta_i in range(theta_count):
+            # update theta for all viewpoints
+            for v in range(len(h.viewpoint)):
+                r, theta, phi = h.viewpoint[v]
+                theta = (theta + angle_increment) % 360
+                h.viewpoint[v] = [r, theta, phi]
+
+                h._log_ll = None
+                log_ll = h.log_likelihood(img)
+                ll[phi_i, theta_i] = log_ll
+
+    ll = np.ravel(ll)
+    return spmisc.logsumexp(ll) - np.log(theta_count * phi_count), np.max(ll)
 
 
 def calculate_similarity_image_given_image(data1, samples, log_probs):
@@ -79,9 +90,9 @@ def calculate_similarity_image_given_image(data1, samples, log_probs):
     print
 
     p_avg = spmisc.logsumexp(logp_data1) - np.log(sample_count)
-    p_wavg = spmisc.logsumexp(logp_data1 + log_probs - spmisc.logsumexp(log_probs))
+    p_wavg = spmisc.logsumexp(logp_data1 + log_probs) - spmisc.logsumexp(log_probs)
     p_best = spmisc.logsumexp(best_logp_data1) - np.log(sample_count)
-    p_wbest = spmisc.logsumexp(best_logp_data1 + log_probs - spmisc.logsumexp(log_probs))
+    p_wbest = spmisc.logsumexp(best_logp_data1 + log_probs) - spmisc.logsumexp(log_probs)
 
     return p_avg, p_wavg, p_best, p_wbest
 
